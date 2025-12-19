@@ -1,5 +1,3 @@
-Please see: https://github.com/GaoYucen/MetaSTC
-
 Environment:
 Python 3.11
 Pytorch 2.6.0

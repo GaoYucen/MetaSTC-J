@@ -1,0 +1,70 @@
+look_back: 12.0000s
+Time: 632.5141s
+Test MAE: 3.5417
+Test RMSE: 5.2698
+Test MSE: 27.7710
+Test MAPE: 0.1143
+Test R2: 0.8035
+look_back: 12.0000s
+Time: 193.6992s
+Test MAE: 3.6628
+Test RMSE: 5.3605
+Test MSE: 28.7350
+Test MAPE: 0.1181
+Test R2: 0.7905
+look_back: 12.0000s
+Time: 9.3653s
+Test MAE: 3.6628
+Test RMSE: 5.3605
+Test MSE: 28.7350
+Test MAPE: 0.1181
+Test R2: 0.7905
+look_back: 12.0000s
+Time: 14.6790s
+Test MAE: 30.0195
+Test RMSE: 35.9531
+Test MSE: 1292.6219
+Test MAPE: 17.5848
+Test R2: -0.2297
+look_back: 12.0000s
+Time: 14.1426s
+Test MAE: 27.2445
+Test RMSE: 30.2201
+Test MSE: 913.2529
+Test MAPE: 76.6535
+Test R2: -5.8136
+look_back: 12.0000s
+Time: 17.4213s
+Test MAE: 3.6628
+Test RMSE: 5.3605
+Test MSE: 28.7350
+Test MAPE: 0.1181
+Test R2: 0.7905
+look_back: 12.0000s
+Time: 20.8600s
+Test MAE: 3.8930
+Test RMSE: 5.5380
+Test MSE: 30.6691
+Test MAPE: 0.1260
+Test R2: 0.7740
+look_back: 12.0000s
+Time: 24.5455s
+Test MAE: 3.6416
+Test RMSE: 5.3447
+Test MSE: 28.5663
+Test MAPE: 0.1173
+Test R2: 0.7917
+look_back: 12.0000s
+Time: 9.7858s
+Test MAE: 3.6431
+Test RMSE: 5.4535
+Test MSE: 29.7404
+Test MAPE: 0.1183
+Test R2: 0.7861
+look_back: 12.0000s
+Time: 24.3729s
+Test MAE: 3.6301
+Test RMSE: 5.4449
+Test MSE: 29.6466
+Test MAPE: 0.1179
+Test R2: 0.7872

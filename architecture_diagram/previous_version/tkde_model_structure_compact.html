@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaSTC-J Model Architecture (Compact)</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background-color: #ffffff;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        #diagram {
+            background-color: #ffffff;
+            /* box-shadow: 0 0 20px rgba(0,0,0,0.1); */
+        }
+        .label-text {
+            font-family: 'Arial', sans-serif;
+            font-size: 11px;
+            fill: #333;
+        }
+        .title-text {
+            font-family: 'Times New Roman', serif;
+            font-weight: bold;
+            font-size: 14px;
+            fill: #000;
+        }
+        .step-label {
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            font-size: 12px;
+            fill: #555;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .math-text {
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+            font-size: 14px;
+        }
+        .dashed-box {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 1;
+            stroke-dasharray: 4, 4;
+        }
+    </style>
+</head>
+<body>
+    <div id="diagram"></div>
+
+    <script>
+        // --- Configuration ---
+        const width = 900;
+        const height = 500;
+        const svg = d3.select("#diagram")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width} ${height}`);
+
+        // Define arrow markers
+        const defs = svg.append("defs");
+        ["arrow", "arrow-blue", "arrow-red", "arrow-green"].forEach(id => {
+            defs.append("marker")
+                .attr("id", id)
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 8)
+                .attr("refY", 0)
+                .attr("markerWidth", 5)
+                .attr("markerHeight", 5)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-5L10,0L0,5")
+                .attr("fill", id === "arrow-blue" ? "#1976D2" : (id === "arrow-red" ? "#D32F2F" : (id === "arrow-green" ? "#388E3C" : "#555")));
+        });
+
+        // --- Helper Functions ---
+        function drawBox(x, y, w, h, text, color, strokeColor = "#333", textColor = "#000") {
+            const g = svg.append("g");
+            g.append("rect")
+                .attr("x", x)
+                .attr("y", y)
+                .attr("width", w)
+                .attr("height", h)
+                .attr("rx", 4)
+                .attr("ry", 4)
+                .attr("fill", color)
+                .attr("stroke", strokeColor)
+                .attr("stroke-width", 1);
+            
+            const lines = text.split("\n");
+            lines.forEach((line, i) => {
+                g.append("text")
+                    .attr("x", x + w / 2)
+                    .attr("y", y + h / 2 + (i - (lines.length - 1) / 2) * 14 + 4)
+                    .attr("text-anchor", "middle")
+                    .attr("class", "label-text")
+                    .style("fill", textColor)
+                    .style("font-weight", "bold")
+                    .text(line);
+            });
+            return {x: x + w/2, y: y + h/2, top: y, bottom: y + h, left: x, right: x + w, width: w, height: h};
+        }
+
+        function drawCylinder(x, y, w, h, text, color) {
+            const g = svg.append("g");
+            const ry = 6;
+            g.append("path").attr("d", `M${x},${y+ry} v${h-2*ry} a${w/2},${ry} 0 0 0 ${w},0 v-${h-2*ry}`).attr("fill", color).attr("stroke", "#333").attr("stroke-width", 1);
+            g.append("ellipse").attr("cx", x + w/2).attr("cy", y + h - ry).attr("rx", w/2).attr("ry", ry).attr("fill", color).attr("stroke", "#333").attr("stroke-width", 1);
+            g.append("ellipse").attr("cx", x + w/2).attr("cy", y + ry).attr("rx", w/2).attr("ry", ry).attr("fill", "#fff").attr("stroke", "#333").attr("stroke-width", 1);
+            g.append("text").attr("x", x + w / 2).attr("y", y + h / 2 + 4).attr("text-anchor", "middle").attr("class", "label-text").style("font-weight", "bold").text(text);
+            return {x: x + w/2, y: y + h/2, top: y, bottom: y + h, left: x, right: x + w, width: w, height: h};
+        }
+
+        // Draw orthogonal path (Manhattan routing)
+        function drawPath(points, color="#555", type="arrow") {
+            const line = d3.line()
+                .x(d => d[0])
+                .y(d => d[1])
+                .curve(d3.curveStepAfter); // Or curveStepBefore based on need, but manual points are better
+            
+            // Manual path string construction for better control
+            let d = `M${points[0][0]},${points[0][1]}`;
+            for (let i = 1; i < points.length; i++) {
+                d += ` L${points[i][0]},${points[i][1]}`;
+            }
+
+            svg.append("path")
+                .attr("d", d)
+                .attr("fill", "none")
+                .attr("stroke", color)
+                .attr("stroke-width", 1.5)
+                .attr("marker-end", `url(#${type})`);
+        }
+
+        // --- Layout ---
+
+        // 1. Background Regions
+        // Step 1
+        svg.append("rect").attr("x", 10).attr("y", 30).attr("width", 210).attr("height", 440).attr("class", "dashed-box");
+        svg.append("text").attr("x", 115).attr("y", 20).attr("text-anchor", "middle").attr("class", "step-label").text("Step 1: Feature Extraction");
+        
+        // Step 2
+        svg.append("rect").attr("x", 230).attr("y", 30).attr("width", 190).attr("height", 440).attr("class", "dashed-box");
+        svg.append("text").attr("x", 325).attr("y", 20).attr("text-anchor", "middle").attr("class", "step-label").text("Step 2: Gating & Clustering");
+
+        // Step 3 (Highlighted)
+        svg.append("rect").attr("x", 430).attr("y", 30).attr("width", 460).attr("height", 440).attr("class", "dashed-box").style("stroke", "#EF9A9A").style("stroke-width", 1.5);
+        svg.append("text").attr("x", 660).attr("y", 20).attr("text-anchor", "middle").attr("class", "step-label").style("fill", "#D32F2F").text("Step 3: Cluster-aware Memory Unit");
+
+        // --- Nodes ---
+
+        // Step 1 Nodes
+        const inputNode = drawBox(45, 50, 140, 40, "Road Network & Flow", "#E3F2FD", "#1976D2");
+        const tFeat = drawBox(25, 130, 80, 40, "Traffic2Vec", "#FFF3E0", "#F57C00");
+        const sFeat = drawBox(125, 130, 80, 40, "Embedding", "#E8F5E9", "#388E3C");
+
+        // Step 2 Nodes
+        const gating = drawBox(250, 130, 150, 40, "Gating Unit (Sigmoid)", "#F3E5F5", "#7B1FA2");
+        const vecH = drawBox(275, 200, 100, 30, "Vector h", "#EEEEEE");
+        const kmeans = drawBox(265, 260, 120, 30, "K-Means++", "#B2EBF2", "#0097A7");
+        const c1 = drawBox(255, 320, 40, 30, "C1", "#E0F7FA", "#006064");
+        const c2 = drawBox(305, 320, 40, 30, "...", "#E0F7FA", "#006064");
+        const ck = drawBox(355, 320, 40, 30, "Ck", "#E0F7FA", "#006064");
+
+        // Step 3 Nodes (Vertical Layout Strategy)
+        const memory = drawCylinder(460, 60, 80, 100, "Memory Mc", "#FFCCBC");
+        const centroids = drawBox(460, 200, 80, 30, "Centroids pk", "#FFECB3", "#FFA000");
+        
+        // Similarity aligned with Vec H
+        const similarity = drawBox(600, 195, 120, 40, "Similarity (a)\nSoftmax(Dist)", "#FFF9C4", "#FBC02D");
+        
+        const resetGate = drawBox(580, 280, 70, 40, "Reset (rt)", "#C8E6C9", "#2E7D32");
+        const updateGate = drawBox(680, 280, 70, 40, "Update (ut)", "#C8E6C9", "#2E7D32");
+        
+        const hybrid = drawBox(600, 360, 140, 40, "Hybrid Init θ", "#E1BEE7", "#7B1FA2");
+        const globalParam = drawBox(780, 360, 60, 40, "Global Φ", "#CFD8DC", "#455A64");
+        
+        const finalModel = drawBox(600, 430, 140, 30, "Task Model M(j,c)", "#C5CAE9", "#303F9F");
+
+        // --- Connections (Orthogonal & Smooth) ---
+
+        // 1. Input -> Features
+        drawPath([[inputNode.x, inputNode.bottom], [inputNode.x, 110], [tFeat.x, 110], [tFeat.x, tFeat.top]]);
+        drawPath([[inputNode.x, inputNode.bottom], [inputNode.x, 110], [sFeat.x, 110], [sFeat.x, sFeat.top]]);
+
+        // 2. Features -> Gating
+        // Merge lines horizontally
+        drawPath([[tFeat.right, tFeat.y], [gating.left, gating.y]]);
+        drawPath([[sFeat.right, sFeat.y], [gating.left, gating.y]]);
+
+        // 3. Gating -> Vec H -> K-Means
+        drawPath([[gating.x, gating.bottom], [vecH.x, vecH.top]]);
+        drawPath([[vecH.x, vecH.bottom], [kmeans.x, kmeans.top]]);
+
+        // 4. K-Means -> Clusters
+        drawPath([[kmeans.x, kmeans.bottom], [kmeans.x, 305], [c1.x, 305], [c1.x, c1.top]]);
+        drawPath([[kmeans.x, kmeans.bottom], [c2.x, c2.top]]);
+        drawPath([[kmeans.x, kmeans.bottom], [kmeans.x, 305], [ck.x, 305], [ck.x, ck.top]]);
+
+        // 5. Vec H -> Similarity (Long horizontal line)
+        // Pass above K-Means, below Gating. y=215 is safe.
+        drawPath([[vecH.right, vecH.y], [similarity.left, similarity.y]], "#555");
+        svg.append("text").attr("x", 440).attr("y", 210).attr("class", "math-text").text("h");
+
+        // 6. Memory -> Centroids
+        drawPath([[memory.x, memory.bottom], [centroids.x, centroids.top]]);
+
+        // 7. Centroids -> Similarity
+        drawPath([[centroids.right, centroids.y], [similarity.left, similarity.y]]);
+
+        // 8. Memory -> Gates (Complex routing)
+        // Route from Memory Right -> Down -> Split
+        const memOutX = memory.right + 20;
+        const memOutY = memory.y;
+        drawPath([[memory.right, memory.y], [memOutX, memory.y], [memOutX, 260], [resetGate.left, 260], [resetGate.left, resetGate.y]], "#D32F2F", "arrow-red");
+        drawPath([[memory.right, memory.y], [memOutX, memory.y], [memOutX, 260], [updateGate.left, 260], [updateGate.left, updateGate.y]], "#D32F2F", "arrow-red");
+        svg.append("text").attr("x", memOutX + 5).attr("y", 150).attr("class", "math-text").style("fill", "#D32F2F").style("font-size", "12px").text("Retrieve");
+
+        // 9. Similarity -> Gates
+        drawPath([[similarity.x, similarity.bottom], [similarity.x, 260], [resetGate.top, 260], [resetGate.x, resetGate.top]]); // To Reset Top
+        drawPath([[similarity.x, similarity.bottom], [similarity.x, 260], [updateGate.top, 260], [updateGate.x, updateGate.top]]); // To Update Top
+
+        // 10. Gates -> Hybrid
+        drawPath([[resetGate.x, resetGate.bottom], [hybrid.x - 20, hybrid.top]]);
+        drawPath([[updateGate.x, updateGate.bottom], [hybrid.x + 20, hybrid.top]]);
+
+        // 11. Global -> Hybrid
+        drawPath([[globalParam.left, globalParam.y], [hybrid.right, hybrid.y]]);
+
+        // 12. Hybrid -> Final
+        drawPath([[hybrid.x, hybrid.bottom], [finalModel.x, finalModel.top]], "#303F9F", "arrow-blue");
+
+    </script>
+</body>
+</html>

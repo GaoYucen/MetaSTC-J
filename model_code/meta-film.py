@@ -10,7 +10,7 @@ from scipy import signal
 from scipy import special as ss
 import torch.nn.functional as F
 
-look_back = 24
+look_back = 12
 look_forward = 6
 
 k = 5
@@ -308,7 +308,7 @@ class Model(nn.Module):
 # Initialize model, loss function, and optimizer
 configs = {
     'task_name': 'long_term_forecast',
-    'seq_len': 24,
+    'seq_len': 12,
     'label_len': 24,
     'pred_len': 6,
     'output_attention': True,
