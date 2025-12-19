@@ -1,34 +1,49 @@
-Environment:
-Python 3.11
-Pytorch 2.6.0
+# MetaSTC-J
 
-data:
-- traffic_flow: samples for traffic flow data
-- link_feature.txt: spatial features for roads
+This repository contains the official implementation of **MetaSTC-J**, a meta-learning framework designed for capturing complex spatio-temporal correlations in traffic flow prediction. This project is an extended version of our ICDM 2024 paper.
 
-model_code:
-- meta-LSTM: MetaSTC+LSTM
-- meta-film: MetaSTC+Film
-- ablation study: including clustering, distance function
+## Environment
 
-To execute:
+- **Python:** 3.11
+- **PyTorch:** 2.6.0
 
-```
+## Project Structure
+
+### Data
+The `data/` directory contains the datasets used for training and evaluation:
+- `traffic_flow/`: Directory containing traffic flow data samples.
+- `link_feature.txt`: Spatial features and attributes for the road network.
+
+### Model Code
+The `model_code/` directory includes the core implementations:
+- `meta-LSTM.py`: Implementation of the MetaSTC framework integrated with LSTM.
+- `meta-film.py`: Implementation of the MetaSTC framework integrated with FiLM (Feature-wise Linear Modulation).
+- `ablation study/`: Scripts for ablation experiments, including clustering analysis and distance function evaluations.
+
+## Usage
+
+To train and evaluate the models, run the following commands from the project root:
+
+**Run MetaSTC + LSTM:**
+```bash
 python model_code/meta-LSTM.py
 ```
 
-```
+**Run MetaSTC + FiLM:**
+```bash
 python model_code/meta-film.py
 ```
 
-### Experimental results:
+## Experimental Results
 
-Table 1: Performance of Models for Beijing (L=12)
+The following table shows the performance comparison on the Beijing dataset with a prediction horizon of $L=12$.
 
-| Model        | MSE | MAE | MAPE | R2 |
-|--------------| --- |  | --- | --- |
-| LSTM         | 46.483 | 4.837 | 0.000 | 0.000 |
-| MetaSTC+LSTM | 27.771 | 3.542 | 0.114 | 0.804 |
+### Table 1: Performance Comparison (Beijing, L=12)
 
+| Model        | MSE      | MAE     | MAPE    | $R^2$   |
+|--------------|----------|---------|---------|---------|
+| LSTM         | 46.483   | 4.837   | 0.000   | 0.000   |
+| MetaSTC+LSTM | 27.771   | 3.542   | 0.114   | 0.804   |
 
-
+---
+*Note: The results above are based on the current experimental configuration. Ensure all data paths are correctly set before execution.*
