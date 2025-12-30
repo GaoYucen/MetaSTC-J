@@ -1,0 +1,21 @@
+look_back: 12.0000s
+Time: 1.8566s
+Test MAE: 3.8455
+Test RMSE: 7.1468
+Test MSE: 51.0766
+Test MAPE: 0.0915
+Test R2: 0.5855
+look_back: 12.0000s
+Time: 1.9676s
+Test MAE: 3.7930
+Test RMSE: 6.8744
+Test MSE: 47.2570
+Test MAPE: 0.0958
+Test R2: 0.5294
+look_back: 12.0000s
+Time: 657.2073s
+Test MAE: 3.3882
+Test RMSE: 5.2341
+Test MSE: 27.3959
+Test MAPE: 0.6554
+Test R2: 0.8235

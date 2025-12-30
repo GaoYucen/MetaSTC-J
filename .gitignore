@@ -1,0 +1,11 @@
+# Ignore ICDM_TKDE_MetaSTC folder
+ICDM_TKDE_MetaSTC/
+
+# macOS specific files
+.DS_Store
+._*
+.Spotlight-*
+.Trashes
+.fseventsd
+.DocumentRevisions-V100
+.TemporaryItems
