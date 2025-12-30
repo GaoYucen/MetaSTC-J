@@ -14,11 +14,15 @@ The `data/` directory contains the datasets used for training and evaluation:
 - `traffic_flow/`: Directory containing traffic flow data samples.
 - `link_feature.txt`: Spatial features and attributes for the road network.
 
-### Model Code
+### Model Code for ICDM
 The `model_code/` directory includes the core implementations:
 - `meta-LSTM.py`: Implementation of the MetaSTC framework integrated with LSTM.
 - `meta-film.py`: Implementation of the MetaSTC framework integrated with FiLM (Feature-wise Linear Modulation).
 - `ablation study/`: Scripts for ablation experiments, including clustering analysis and distance function evaluations.
+
+### Model Code for TKDE
+- previous_version: The standard version of TKDE
+- `metastc_lstm.py`: The debug version
 
 ## Usage
 
