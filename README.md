@@ -86,3 +86,30 @@ Shanghai 和 Beijing 的原始流量统计相近，Shanghai 最大值约 95.1、
 ```
 
 历史结果未覆盖本次 `param/4090_tuned/` 输出。
+
+## ICDM 2024 Paper Results and Journal Targets
+
+The journal extension must be evaluated against the **official ICDM 2024 paper results under the same protocol**, rather than only against internal smoke-test or temporal-holdout baselines. The paper uses an 8:2 train/test split, predicts the next 6 steps from the previous 12 or 24 steps, and reports MAE and MSE.
+
+### Official ICDM 2024 results (Table IV)
+
+| Dataset | Model | MAE (L=12) | MSE (L=12) | MAE (L=24) | MSE (L=24) |
+|---|---|---:|---:|---:|---:|
+| Beijing | MetaSTC+LSTM | 3.534 | 27.433 | 3.710 | 29.040 |
+| Beijing | MetaSTC+FiLM | 3.367 | 26.893 | 3.476 | 27.527 |
+| Shanghai | MetaSTC+LSTM | 4.524 | 42.380 | 4.429 | 40.276 |
+| Shanghai | MetaSTC+FiLM | 4.018 | 37.076 | 4.173 | 37.992 |
+| LargeST | MetaSTC+LSTM | 4.644 | 45.520 | 5.032 | 49.102 |
+| LargeST | MetaSTC+FiLM | 4.369 | 43.333 | 4.491 | 44.398 |
+
+### Journal-version success criterion
+
+The final MetaSTC-J model must be compared under the **same paper evaluation protocol** and should improve upon the corresponding ICDM MetaSTC values above. Internal temporal-holdout experiments are useful for diagnosing distribution shift and robustness, but they are not substitutes for the official paper-protocol comparison.
+
+For the current first-stage Beijing + LSTM development at L=12, the minimum paper-level target is therefore:
+
+- MAE < **3.534**
+- MSE < **27.433**
+
+A practically meaningful journal improvement should ideally be stable across Beijing, Shanghai, and LargeST and exceed the paper result by more than a marginal numerical fluctuation.
+
