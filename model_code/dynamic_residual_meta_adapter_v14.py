@@ -161,6 +161,7 @@ def _eval(adapter, experts, loaders, device: torch.device, scale: float, max_bat
 
 def main():
     ap=argparse.ArgumentParser()
+    ap.add_argument("--dataset",choices=["beijing","shanghai","largest"],default="beijing")
     ap.add_argument("--checkpoint-dir",default="param/4090_tuned/lstm/beijing")
     ap.add_argument("--output-dir",default="param/journal/dynamic_residual_meta_adapter_v14/beijing_lstm")
     ap.add_argument("--device",default="cuda:0"); ap.add_argument("--clusters",type=int,default=5)
@@ -172,7 +173,7 @@ def main():
     ap.add_argument("--gate-bias",type=float,default=-1.5); ap.add_argument("--seed",type=int,default=42)
     args=ap.parse_args(); _set_seed(args.seed); device=_device(args.device)
     checkpoint_dir=Path(args.checkpoint_dir); out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
-    flow,_,scale=_load_flow("beijing"); labels=_load_labels(checkpoint_dir,flow.shape[0],args.clusters)
+    flow,_,scale=_load_flow(args.dataset); labels=_load_labels(checkpoint_dir,flow.shape[0],args.clusters)
     fit_x,fit_y,val_x,val_y,test_x,test_y=_windows(flow,12,6)
     train_loaders=_loaders(_cluster_tensors(fit_x,fit_y,labels,args.clusters),args.batch_size,device,True)
     val_loaders=_loaders(_cluster_tensors(val_x,val_y,labels,args.clusters),args.batch_size,device,False)
@@ -206,7 +207,12 @@ def main():
         if score<best_score: best_score=score; best_state=copy.deepcopy(adapter.state_dict()); torch.save(best_state,out/"adapter_best.pt")
     adapter.load_state_dict(best_state)
     validation=_eval(adapter,experts,val_loaders,device,scale,args.eval_max_batches); test=_eval(adapter,experts,test_loaders,device,scale,args.eval_max_batches)
-    result={"experiment":"dynamic_residual_meta_adapter_v14","protocol":"paper-style 80/20 temporal split, L=12, P=6; frozen 4090-tuned MetaSTC cluster experts","config":vars(args),"paper_target_l12":{"MAE":3.534,"MSE":27.433},"reproduced_static_reference":{"MAE":3.4990,"MSE":27.1918},"initial_test":initial,"validation":validation,"test":test,"history":history}
+    paper_targets={
+        "beijing":{"MAE":3.534,"MSE":27.433},
+        "shanghai":{"MAE":4.524,"MSE":42.380},
+        "largest":{"MAE":4.644,"MSE":45.520},
+    }
+    result={"experiment":"dynamic_residual_meta_adapter_v14","dataset":args.dataset,"protocol":"paper-style 80/20 temporal split, L=12, P=6; frozen 4090-tuned MetaSTC cluster experts","config":vars(args),"paper_target_l12":paper_targets[args.dataset],"reproduced_static_reference":{"MAE":initial["static"]["MAE"],"MSE":initial["static"]["MSE"]},"initial_test":initial,"validation":validation,"test":test,"history":history}
     (out/"metrics.json").write_text(json.dumps(result,indent=2),encoding="utf-8"); print("V14_RESULT"); print(json.dumps(result,indent=2))
 
 if __name__=="__main__": main()
