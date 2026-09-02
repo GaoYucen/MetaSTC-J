@@ -1,0 +1,16 @@
+{
+  "family": "lstm",
+  "dataset": "shanghai",
+  "look_back": 12,
+  "look_forward": 6,
+  "clusters": 3,
+  "batch_size": 8192,
+  "epochs": 20,
+  "adapt_epochs": 1,
+  "max_batches": null,
+  "seed": 42,
+  "device": "cuda:0",
+  "amp": true,
+  "torch": "2.6.0+cu124",
+  "cuda": "12.4"
+}
