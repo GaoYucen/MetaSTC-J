@@ -114,7 +114,7 @@ def _eval_loss(
     gate.eval()
     losses = []
     with torch.no_grad():
-        for data, target, road in _limited(loader, max_batches):
+        for data, target, road, _ in _limited(loader, max_batches):
             data = data.to(device, non_blocking=True)
             target = target.to(device, non_blocking=True)
             road = road.to(device, non_blocking=True)
