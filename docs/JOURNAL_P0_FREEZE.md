@@ -93,5 +93,15 @@ Automated continuation may execute the frozen P0 matrix, aggregate results, fill
 ## Frozen implementation SHA256
 ```text
 3b42073bdce7b5169e1ed10faed94d9b2781e3115de83e02fde6fa835ec0a66f  model_code/dynamic_residual_mechanism_v14.py
-2e095c22fbb87e5ca8dda58f022cbf43106c106bf7cc2159c91543017a91ccbb  model_code/dynamic_residual_mechanism_sweep_v14.py
+54e9c9d12b104c4f29b1224144c2a3b3dec4a18f3d71c759149e63faa4ad9137  model_code/dynamic_residual_mechanism_sweep_v14.py
 ```
+
+
+## 2026-09-05 post-freeze operational fix — dataset-native cluster counts
+
+The first governed P0-01 sweep exposed a loader bug: the sweep hard-coded five clusters for every dataset, while the frozen static checkpoints were trained with their native configured cluster counts: Beijing=5, Shanghai=3, LargeST=3. Shanghai and LargeST therefore correctly contain only `cluster_0.pt` through `cluster_2.pt`; attempting to load `cluster_3.pt` was erroneous.
+
+The sweep now uses the dataset-specific frozen cluster count (`5/3/3`) while leaving the research question, static checkpoints, data split, seeds, matched variants, objectives, training budget, and evaluation metrics unchanged. This is an operational/reproducibility bugfix, not an architecture or protocol change.
+
+- pre-fix sweep SHA256: `2e095c22fbb87e5ca8dda58f022cbf43106c106bf7cc2159c91543017a91ccbb`
+- post-fix sweep SHA256: `54e9c9d12b104c4f29b1224144c2a3b3dec4a18f3d71c759149e63faa4ad9137`

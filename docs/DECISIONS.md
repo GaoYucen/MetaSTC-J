@@ -23,3 +23,7 @@ Freeze implementation, seeds, controls, data/protocol, and Go/No-Go criteria bef
 
 ## Persistent handoff
 Use `docs/JOURNAL_P0_FREEZE.md`, `RESEARCH_STATE.md`, `NEXT_STEPS.md`, `DECISIONS.md`, and `EXPERIMENT_LOG.md` as the cross-device/session handoff layer. Notion is the human-facing research record; the frozen GitHub files define the executable protocol.
+
+
+## 2026-09-05 post-freeze operational fix — dataset-native cluster counts
+The failed P0-01 job stopped at Shanghai because the sweep assumed 5 clusters globally. Frozen checkpoint configs and labels show Beijing=5, Shanghai=3, LargeST=3. The sweep was minimally repaired to use those native counts. No research hypothesis, architecture, data split, objective, training budget, matched-control set, or evaluation protocol changed. P0-01 can resume from existing per-seed outputs.

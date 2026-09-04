@@ -40,7 +40,11 @@ DATASETS = {
     'largest': Path('param/4090_tuned/epoch60/lstm/largest'),
 }
 DEVICE = 'cuda:0'
-CLUSTERS = 5
+DATASET_CLUSTERS = {
+    'beijing': 5,
+    'shanghai': 3,
+    'largest': 3,
+}
 CACHE_BATCH = 32768
 ADAPTER_BATCH = 16384
 EPOCHS = 10
@@ -78,15 +82,15 @@ class SharedNoTaskAdapter(DynamicResidualMetaAdapter):
         return (base2 + correction).unsqueeze(-1), gate, correction
 
 
-def build_adapter(variant: str):
+def build_adapter(variant: str, clusters: int):
     if variant == 'v14':
-        return DynamicResidualMetaAdapter(CLUSTERS, correction_limit=CORRECTION_LIMIT, gate_bias=GATE_BIAS)
+        return DynamicResidualMetaAdapter(clusters, correction_limit=CORRECTION_LIMIT, gate_bias=GATE_BIAS)
     if variant == 'constant_gate':
-        return ConstantGateAdapter(CLUSTERS, CORRECTION_LIMIT, GATE_BIAS)
+        return ConstantGateAdapter(clusters, CORRECTION_LIMIT, GATE_BIAS)
     if variant == 'shared_no_task':
-        return SharedNoTaskAdapter(CLUSTERS, CORRECTION_LIMIT, GATE_BIAS)
+        return SharedNoTaskAdapter(clusters, CORRECTION_LIMIT, GATE_BIAS)
     if variant == 'linear_cluster':
-        return LinearClusterAdapter(CLUSTERS, CORRECTION_LIMIT, GATE_BIAS)
+        return LinearClusterAdapter(clusters, CORRECTION_LIMIT, GATE_BIAS)
     raise ValueError(variant)
 
 
@@ -152,7 +156,7 @@ def evaluate_cached(adapter, loaders, device, scale):
     }
 
 
-def train_one(dataset, variant, seed, cached_train, cached_val, cached_test,
+def train_one(dataset, variant, seed, clusters, cached_train, cached_val, cached_test,
               experts, labels, fit_x, test_x, test_y, device, scale):
     out = ROOT / dataset / variant / f'seed_{seed}'
     metrics_path = out / 'metrics.json'
@@ -164,7 +168,7 @@ def train_one(dataset, variant, seed, cached_train, cached_val, cached_test,
     train_loaders = cached_loaders(cached_train, True)
     val_loaders = cached_loaders(cached_val, False)
     test_loaders = cached_loaders(cached_test, False)
-    adapter = build_adapter(variant).to(device)
+    adapter = build_adapter(variant, clusters).to(device)
     optimizer = torch.optim.AdamW(
         [p for p in adapter.parameters() if p.requires_grad],
         lr=LR,
@@ -220,7 +224,7 @@ def train_one(dataset, variant, seed, cached_train, cached_val, cached_test,
     diag = {'per_window': [], 'correlations': {}}
     if variant == 'v14' and seed == 42:
         diag = diagnostics(
-            adapter, experts, labels, fit_x, test_x, test_y, device, scale, CLUSTERS
+            adapter, experts, labels, fit_x, test_x, test_y, device, scale, clusters
         )
     result = {
         'experiment': 'dynamic_residual_mechanism_v14_fast',
@@ -311,19 +315,20 @@ def main():
     device = _device(DEVICE)
     all_results = {ds: {v: [] for v in VARIANTS} for ds in DATASETS}
     for dataset, checkpoint in DATASETS.items():
-        print('CACHE_START', dataset, flush=True)
+        clusters = DATASET_CLUSTERS[dataset]
+        print('CACHE_START', dataset, 'clusters', clusters, flush=True)
         flow, _, scale = _load_flow(dataset)
-        labels = _load_labels(checkpoint, flow.shape[0], CLUSTERS)
+        labels = _load_labels(checkpoint, flow.shape[0], clusters)
         fit_x, fit_y, val_x, val_y, test_x, test_y = _windows(flow, 12, 6)
-        experts = _load_experts(checkpoint, CLUSTERS, device)
+        experts = _load_experts(checkpoint, clusters, device)
         train_raw = _loaders(
-            _cluster_tensors(fit_x, fit_y, labels, CLUSTERS), CACHE_BATCH, device, False
+            _cluster_tensors(fit_x, fit_y, labels, clusters), CACHE_BATCH, device, False
         )
         val_raw = _loaders(
-            _cluster_tensors(val_x, val_y, labels, CLUSTERS), CACHE_BATCH, device, False
+            _cluster_tensors(val_x, val_y, labels, clusters), CACHE_BATCH, device, False
         )
         test_raw = _loaders(
-            _cluster_tensors(test_x, test_y, labels, CLUSTERS), CACHE_BATCH, device, False
+            _cluster_tensors(test_x, test_y, labels, clusters), CACHE_BATCH, device, False
         )
         cached_train = cache_static_outputs(experts, train_raw, device)
         cached_val = cache_static_outputs(experts, val_raw, device)
@@ -332,7 +337,7 @@ def main():
         for seed in SEEDS:
             for variant in VARIANTS:
                 result = train_one(
-                    dataset, variant, seed,
+                    dataset, variant, seed, clusters,
                     cached_train, cached_val, cached_test,
                     experts, labels, fit_x, test_x, test_y, device, scale,
                 )

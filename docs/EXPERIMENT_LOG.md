@@ -37,3 +37,7 @@ Frozen implementation/protocol commit: `2a50bc0645a589652e238af5ee133448f5d4e1da
 Frozen tag: `metastc-j-p0-v14-freeze-20260905`
 
 See `docs/JOURNAL_P0_FREEZE.md` for exact P0 scope, controls, decision rule, and implementation SHA256 values.
+
+
+## 2026-09-05 post-freeze operational fix — dataset-native cluster counts
+The failed P0-01 job stopped at Shanghai because the sweep assumed 5 clusters globally. Frozen checkpoint configs and labels show Beijing=5, Shanghai=3, LargeST=3. The sweep was minimally repaired to use those native counts. No research hypothesis, architecture, data split, objective, training budget, matched-control set, or evaluation protocol changed. P0-01 can resume from existing per-seed outputs.
