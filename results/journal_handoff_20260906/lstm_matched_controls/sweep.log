@@ -1,0 +1,6 @@
+CACHE_START beijing
+data_load_seconds=0.069 nodes=7949 time_steps=288
+CACHE_DONE beijing
+DONE beijing v14 42 MAE 3.512543 REL% 0.3867 PARAMS 10871
+DONE beijing constant_gate 42 MAE 3.510861 REL% 0.3386 PARAMS 10831
+DONE beijing shared_no_task 42 MAE 3.573721 REL% 2.1351 PARAMS 10839

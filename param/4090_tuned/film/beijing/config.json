@@ -1,0 +1,16 @@
+{
+  "family": "film",
+  "dataset": "beijing",
+  "look_back": 12,
+  "look_forward": 6,
+  "clusters": 5,
+  "batch_size": 4096,
+  "epochs": 20,
+  "adapt_epochs": 1,
+  "max_batches": null,
+  "seed": 42,
+  "device": "cuda:0",
+  "amp": false,
+  "torch": "2.6.0+cu124",
+  "cuda": "12.4"
+}

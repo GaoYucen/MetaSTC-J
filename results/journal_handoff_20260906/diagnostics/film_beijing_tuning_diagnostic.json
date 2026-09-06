@@ -1,0 +1,113 @@
+{
+  "pilot": false,
+  "research_round": "J2-03",
+  "research_question": "Is Beijing's isolated MAE miss explained by an existing validation-side FiLM setting without changing architecture or protocol?",
+  "research_round_complete": true,
+  "decision_candidate": "YELLOW",
+  "selection_rule": "minimum validation dynamic MAE only; test metrics not used for selection",
+  "bounded_grid": [
+    {
+      "name": "base",
+      "lr": 0.001,
+      "gate_bias": -1.5,
+      "validation_MAE": 4.581090450286865,
+      "completed": true
+    },
+    {
+      "name": "low_lr",
+      "lr": 0.0005,
+      "gate_bias": -1.5,
+      "validation_MAE": 4.577970027923584,
+      "completed": true
+    },
+    {
+      "name": "lower_gate",
+      "lr": 0.001,
+      "gate_bias": -2.0,
+      "validation_MAE": 4.583762168884277,
+      "completed": true
+    },
+    {
+      "name": "low_lr_lower_gate",
+      "lr": 0.0005,
+      "gate_bias": -2.0,
+      "validation_MAE": 4.575356960296631,
+      "completed": true
+    }
+  ],
+  "selected": {
+    "name": "low_lr_lower_gate",
+    "lr": 0.0005,
+    "gate_bias": -2.0,
+    "validation_MAE": 4.575356960296631,
+    "validation_MSE": 51.218780517578125,
+    "test_MAE": 3.4341328144073486,
+    "test_MSE": 27.12059211730957,
+    "artifact": "outputs/j2_film/j2_03_beijing_val_grid_seed42/low_lr_lower_gate/metrics.json",
+    "target": {
+      "MAE": 3.367,
+      "MSE": 26.893
+    },
+    "beats_target_MAE": false,
+    "beats_target_MSE": false,
+    "relative_MAE_vs_target_pct": 1.9938465817448403,
+    "relative_MSE_vs_target_pct": 0.8462875741255038
+  },
+  "full_result_path": "outputs/j2_film/j2_03_beijing_val_grid_seed42/result_summary.json",
+  "next_if_green": "Proceed to J2-04 bundled five-seed P0 confirmation with the validation-selected Beijing setting and fixed Shanghai/LargeST settings.",
+  "next_if_not_green": "Stop for global review; the single authorized J2 validation diagnostic is exhausted.",
+  "all_rows": [
+    {
+      "name": "base",
+      "lr": 0.001,
+      "gate_bias": -1.5,
+      "rc": 0,
+      "artifact": "outputs/j2_film/j2_03_beijing_val_grid_seed42/base/metrics.json",
+      "error": null,
+      "validation_MAE": 4.581090450286865,
+      "validation_MSE": 51.20977020263672,
+      "test_MAE": 3.4149019718170166,
+      "test_MSE": 26.873443603515625,
+      "completed": true
+    },
+    {
+      "name": "low_lr",
+      "lr": 0.0005,
+      "gate_bias": -1.5,
+      "rc": 0,
+      "artifact": "outputs/j2_film/j2_03_beijing_val_grid_seed42/low_lr/metrics.json",
+      "error": null,
+      "validation_MAE": 4.577970027923584,
+      "validation_MSE": 51.24809265136719,
+      "test_MAE": 3.4267961978912354,
+      "test_MSE": 27.05289077758789,
+      "completed": true
+    },
+    {
+      "name": "lower_gate",
+      "lr": 0.001,
+      "gate_bias": -2.0,
+      "rc": 0,
+      "artifact": "outputs/j2_film/j2_03_beijing_val_grid_seed42/lower_gate/metrics.json",
+      "error": null,
+      "validation_MAE": 4.583762168884277,
+      "validation_MSE": 51.11314010620117,
+      "test_MAE": 3.4173007011413574,
+      "test_MSE": 26.904237747192383,
+      "completed": true
+    },
+    {
+      "name": "low_lr_lower_gate",
+      "lr": 0.0005,
+      "gate_bias": -2.0,
+      "rc": 0,
+      "artifact": "outputs/j2_film/j2_03_beijing_val_grid_seed42/low_lr_lower_gate/metrics.json",
+      "error": null,
+      "validation_MAE": 4.575356960296631,
+      "validation_MSE": 51.218780517578125,
+      "test_MAE": 3.4341328144073486,
+      "test_MSE": 27.12059211730957,
+      "completed": true
+    }
+  ]
+}

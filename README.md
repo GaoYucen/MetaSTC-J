@@ -1,5 +1,10 @@
 # MetaSTC-J 4090 训练实验记录
 
+## 2026-09-06 学生交接入口
+
+当前期刊扩展已进入结果收口和学生交接阶段。请优先阅读 [`STUDENT_HANDOFF.md`](STUDENT_HANDOFF.md)；冻结结果位于 `results/journal_handoff_20260906/`。
+
+
 ## 项目说明
 
 本项目用于复现 `ICDM_MetaSTC.pdf` 中的 MetaSTC 交通流预测实验。实验代码位于 `model_code/`，数据位于 `data/`。
