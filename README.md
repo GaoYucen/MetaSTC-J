@@ -1,120 +1,212 @@
-# MetaSTC-J 4090 训练实验记录
+# MetaSTC-J — MetaSTC Journal Extension
 
-## 2026-09-06 学生交接入口
+> Last updated: **2026-09-07**  
+> Active branch: **`dev-260902-dynamic`**  
+> Current phase: **journal manuscript consolidation / student handoff**  
+> Frozen handoff commit: **`30ac60507ac5c52e7251309d8f68f0f3d73ae7dd`**
 
-当前期刊扩展已进入结果收口和学生交接阶段。请优先阅读 [`STUDENT_HANDOFF.md`](STUDENT_HANDOFF.md)；冻结结果位于 `results/journal_handoff_20260906/`。
+MetaSTC-J is the journal extension of the ICDM 2024 MetaSTC work. The current experimental exploration has been **closed and frozen**. The default next step is no longer open-ended architecture tuning; it is to consolidate the paper, verify all claims against the frozen evidence, and add only genuinely necessary reviewer-facing experiments after PI review.
 
+## Start here
 
-## 项目说明
+Students taking over this project should read the following files in order:
 
-本项目用于复现 `ICDM_MetaSTC.pdf` 中的 MetaSTC 交通流预测实验。实验代码位于 `model_code/`，数据位于 `data/`。
+1. [`STUDENT_HANDOFF.md`](STUDENT_HANDOFF.md)
+2. [`docs/STUDENT_HANDOFF_20260906.md`](docs/STUDENT_HANDOFF_20260906.md)
+3. [`results/journal_handoff_20260906/unified_results.md`](results/journal_handoff_20260906/unified_results.md)
+4. [`docs/JOURNAL_P0_FREEZE.md`](docs/JOURNAL_P0_FREEZE.md)
+5. [`results/journal_handoff_20260906/lstm_matched_controls/summary.md`](results/journal_handoff_20260906/lstm_matched_controls/summary.md)
+6. [`manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex`](manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex)
 
-## 远程运行环境
-
-- SSH 主机：`4090`
-- 项目目录：`/workspace/MetaSTC-J`
-- Python：`/opt/conda/bin/python`
-- PyTorch：`2.6.0+cu124`
-- GPU：2 张 NVIDIA GeForce RTX 4090，每张显存约 24.6 GB
-
-## 当前统一配置
-
-六组实验均使用 12 步输入、6 步预测、80/20 时间划分、训练集末 10% 作为验证集，以及 1 轮聚类适配。 各模型参数说明见 [CONFIG_4090.md](CONFIG_4090.md)。
-
-| 模型 | 数据集 | 聚类数 | batch size | epochs | 精度 |
-|---|---|---:|---:|---:|---|
-| LSTM | Beijing | 5 | 8192 | 20 | FP16 AMP |
-| LSTM | Shanghai | 3 | 8192 | 60 | FP16 AMP |
-| LSTM | LargeST | 3 | 8192 | 60 | FP16 AMP |
-| FiLM | Beijing | 5 | 4096 | 20 | FP32 |
-| FiLM | Shanghai | 3 | 4096 | 20 | FP32 |
-| FiLM | LargeST | 3 | 4096 | 60 | FP32 |
-
-FiLM 保持 FP32 是因为当前 FFT 长度为 6 时，FP16/BF16 会触发 cuFFT 限制。DataLoader 使用 pinned memory、非阻塞拷贝和 `num_workers=0`。两张 GPU 通过独立进程并行运行。
-
-## 最新正式结果
-
-结果文件位于 `param/4090_tuned/{lstm,film}/{beijing,shanghai,largest}/`，每个目录包含 `config.json`、`global_best.pt`、聚类 checkpoint、`cluster_labels.txt`、`train.log` 和 `metrics.json`。
-
-| 数据集 | 模型 | MAE | RMSE | MSE | MAPE | R² | 训练时间（秒） |
-|---|---|---:|---:|---:|---:|---:|---:|
-| Beijing | MetaSTC + LSTM | 3.4990 | 5.2146 | 27.1918 | 0.1403 | 0.8461 | 419.724 |
-| Beijing | MetaSTC + FiLM | 3.3819 | 5.2387 | 27.4442 | 0.1343 | 0.8447 | 808.419 |
-| Shanghai | MetaSTC + LSTM | 4.3744 | 6.3861 | 40.7825 | 0.1845 | 0.7703 | 23.122 |
-| Shanghai | MetaSTC + FiLM | 3.9524 | 6.0189 | 36.2273 | 0.1733 | 0.7959 | 18.873 |
-| LargeST | MetaSTC + LSTM | 34.5379 | 50.0249 | 2502.4915 | 0.1916 | 0.9160 | 199.929 |
-| LargeST | MetaSTC + FiLM | 32.4801 | 51.5553 | 2657.9458 | 0.1403 | 0.9107 | 413.325 |
-
-### LargeST 论文尺度结果
-
-当前 LargeST 源数据最大值为 998.0。为匹配论文报告尺度，额外生成了
-`data/gla/gla_his_2019_first288_paper_scale.npy`，固定缩放比例为 7.15，缩放后最大值约为 139.5804。
-该缩放不会改变 max-normalization 后的模型输入，只改变反归一化指标的报告单位。
-
-完整 60 epoch 结果如下：
-
-| 模型 | Raw MAE | Raw MSE | Raw RMSE | Paper-scale MAE（估计） | Paper-scale MSE（估计） | 时间（秒） |
-|---|---:|---:|---:|---:|---:|---:|
-| MetaSTC + LSTM | 33.0061 | 2350.3718 | 48.4806 | 4.619 | 46.021 | 519.6 |
-| MetaSTC + FiLM | 32.5278 | 2661.8372 | 51.5930 | 4.257 | 45.587 | 1206.8 |
-
-论文对应结果为 LSTM 的 MAE/MSE `4.644/45.520`、FiLM 的 `4.369/43.333`。LSTM 的缩放后结果与论文较为接近；FiLM 的差异还可能来自模型配置或训练过程。
-
-北京结果相较旧记录已有改善：LSTM 的 MAE/MSE 从约 3.80/29.90 降至 3.4990/27.1918；FiLM 的 MAE/MSE 从约 3.49/27.86 降至 3.3819/27.4442。
-
-## 训练时间分析：为什么北京明显慢于上海
-
-核心原因是训练样本按节点展开：`样本数 ≈ 时间窗口数 × 节点数`。两个数据集都只有 288 个时间点，12→6 设置下时间窗口数量基本相同；但北京有 7949 个路段，上海只有 144 个路段，北京节点数约为上海的 55 倍。
-
-- 北京 LSTM 约需处理 55 倍的节点展开样本，耗时约 420 秒；上海约 7 秒。
-- 北京 FiLM 耗时约 808 秒；上海约 19 秒。FiLM 还必须使用 FP32 FFT。
-- 北京 5 个聚类、上海 3 个聚类，适配阶段只增加少量开销，不是主要原因。
-- 训练期间显存约 1.5 GB，说明不是显存瓶颈，主要耗时来自 FiLM 的 FP32 计算、数据展开/拷贝以及大量节点样本的前向和反向计算。
-
-## Shanghai LSTM 效果较差的原因
-
-Shanghai 和 Beijing 的原始流量统计相近，Shanghai 最大值约 95.1、均值约 35.8；当前代码也使用相同的全局最大值归一化。因此主要问题更可能是小样本训练和优化不足：
-
-1. Shanghai 只有 144 个节点。288 个时间点按 80/20 划分后，训练部分约 230 个时间点；12→6 滑窗后约 214 个窗口，训练集末 10% 再留作验证，真正用于全局训练的约 192 个窗口。
-2. Shanghai LSTM 每轮只有少量 batch，20 轮总训练时间仅 6.99 秒。训练日志显示验证损失从 0.0926 持续下降到 0.0158，最后几轮仍在下降，说明固定 20 轮和 1 轮适配偏保守，模型尚未充分收敛。
-3. Shanghai LSTM 使用 AMP，但小数据集几乎没有速度收益；FP16 的数值裕量反而小于 FP32。FiLM 使用 FP32 后 MAE 为 3.9524，说明问题主要偏向 LSTM 的小样本优化/泛化，而非数据不可预测。
-4. 测试区间只有约 20% 的时间序列，测试窗口较少，异常时段会显著影响 MAE、MAPE 和 R²。LSTM 的 R² 仅 0.4244，表明预测方差解释能力不足。
-
-优先建议：仅对 Shanghai LSTM 使用 FP32，将全局训练轮数增加到 50–100、适配轮数增加到 3–5，并依据验证集早停选择 checkpoint。若保持统一配置，Shanghai FiLM 当前结果更稳定。
-
-## 运行接口
-
-六个入口脚本统一支持：
+The frozen result package is located at:
 
 ```text
---device --batch-size --epochs --adapt-epochs --max-batches --seed --no-plot --output-dir
+results/journal_handoff_20260906/
 ```
 
-历史结果未覆盖本次 `param/4090_tuned/` 输出。
+The current editable journal manuscript is located at:
 
-## ICDM 2024 Paper Results and Journal Targets
+```text
+manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex
+```
 
-The journal extension must be evaluated against the **official ICDM 2024 paper results under the same protocol**, rather than only against internal smoke-test or temporal-holdout baselines. The paper uses an 8:2 train/test split, predicts the next 6 steps from the previous 12 or 24 steps, and reports MAE and MSE.
+## Current research route
 
-### Official ICDM 2024 results (Table IV)
+The journal extension preserves the conference MetaSTC model as a strong **Static MetaSTC Anchor** and adds a conservative context-conditioned residual adaptation mechanism:
 
-| Dataset | Model | MAE (L=12) | MSE (L=12) | MAE (L=24) | MSE (L=24) |
-|---|---|---:|---:|---:|---:|
-| Beijing | MetaSTC+LSTM | 3.534 | 27.433 | 3.710 | 29.040 |
-| Beijing | MetaSTC+FiLM | 3.367 | 26.893 | 3.476 | 27.527 |
-| Shanghai | MetaSTC+LSTM | 4.524 | 42.380 | 4.429 | 40.276 |
-| Shanghai | MetaSTC+FiLM | 4.018 | 37.076 | 4.173 | 37.992 |
-| LargeST | MetaSTC+LSTM | 4.644 | 45.520 | 5.032 | 49.102 |
-| LargeST | MetaSTC+FiLM | 4.369 | 43.333 | 4.491 | 44.398 |
+```text
+y_hat = y_static + gate(context) * residual(context, task/state)
+```
 
-### Journal-version success criterion
+The intended interpretation is a **continuous context-conditioned latent task/state representation**, rather than a claim that discrete dynamic task discovery has been established.
 
-The final MetaSTC-J model must be compared under the **same paper evaluation protocol** and should improve upon the corresponding ICDM MetaSTC values above. Internal temporal-holdout experiments are useful for diagnosing distribution shift and robustness, but they are not substitutes for the official paper-protocol comparison.
+Current frozen implementations:
 
-For the current first-stage Beijing + LSTM development at L=12, the minimum paper-level target is therefore:
+- LSTM mechanism: `model_code/dynamic_residual_mechanism_v14.py`
+- LSTM matched-control sweep: `model_code/dynamic_residual_mechanism_sweep_v14.py`
+- FiLM realization: `model_code/dynamic_residual_meta_adapter_film_v14.py`
 
-- MAE < **3.534**
-- MSE < **27.433**
+Do not silently modify the frozen V14 mechanism. Architecture changes require a new research decision and a new version.
 
-A practically meaningful journal improvement should ideally be stable across Beijing, Shanghai, and LargeST and exceed the paper result by more than a marginal numerical fluctuation.
+## Latest paper-level results
 
+The authoritative summary is [`results/journal_handoff_20260906/unified_results.md`](results/journal_handoff_20260906/unified_results.md). Results below use seeds **42–46**. Negative Δ means the journal V14 result is better than the corresponding ICDM 2024 MetaSTC result.
+
+| Realization | Dataset | ICDM MAE | Journal MAE mean ± std | ΔMAE | MAE wins | ICDM MSE | Journal MSE mean ± std | ΔMSE | MSE wins |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| LSTM | Beijing | 3.534 | **3.5109 ± 0.0191** | **-0.65%** | **5/5** | 27.433 | **27.2152 ± 0.2567** | **-0.79%** | 4/5 |
+| LSTM | Shanghai | 4.524 | **4.2654 ± 0.0177** | **-5.72%** | **5/5** | 42.380 | **39.3072 ± 0.2180** | **-7.25%** | **5/5** |
+| LSTM | LargeST | 4.644 | **4.4582 ± 0.0328** | **-4.00%** | **5/5** | 45.520 | **44.6292 ± 0.4482** | **-1.96%** | **5/5** |
+| FiLM | Beijing | 3.367 | 3.3975 ± 0.0173 | +0.91% | 0/5 | 26.893 | **26.7645 ± 0.1578** | **-0.48%** | 4/5 |
+| FiLM | Shanghai | 4.018 | 4.0368 ± 0.0435 | +0.47% | 1/5 | 37.076 | **36.2305 ± 0.2833** | **-2.28%** | **5/5** |
+| FiLM | LargeST | 4.369 | **4.2718 ± 0.0154** | **-2.22%** | **5/5** | 43.333 | **43.0410 ± 0.2948** | **-0.67%** | 4/5 |
+
+### Main performance conclusion
+
+**LSTM V14 is the primary journal result.** Its five-seed mean MAE and MSE both improve over ICDM 2024 MetaSTC+LSTM on Beijing, Shanghai, and LargeST. More importantly, all **15 dataset-seed MAE runs** (3 datasets × 5 seeds) beat the corresponding conference-paper value.
+
+This is sufficiently stable to serve as the main performance evidence. The project should not return to open-ended LSTM tuning merely to enlarge the numerical gains.
+
+### FiLM conclusion
+
+FiLM is supporting evidence that the framework transfers to another realization/backbone, but the gain is **dataset- and metric-dependent**:
+
+- LargeST improves both MAE and MSE across five-seed means.
+- Beijing and Shanghai improve mean MSE, but mean MAE is slightly worse than the conference FiLM result by about 0.91% and 0.47%, respectively.
+- Therefore the paper may claim cross-realization applicability, but **must not claim universal performance improvement for FiLM**.
+
+## Mechanism evidence and claim boundary
+
+The matched-control experiments are essential for interpreting V14 correctly.
+
+Current evidence does **not** support a universal claim that richer context-conditioned adaptation always dominates simpler residual controls:
+
+- On **Beijing**, `linear_cluster` has lower matched-control mean MAE than V14.
+- On **LargeST**, `shared_no_task` has lower matched-control mean MAE than V14.
+- **Shanghai** is the clearest positive mechanism case: for V14 seed 42, V14 beats the linear control on all 40 test windows, and the high-static-error tercile shows about **0.0928 additional MAE benefit** over the linear control.
+
+The journal story should therefore emphasize **selective/context-dependent value under difficult regimes**, while reporting the Beijing and LargeST counterevidence transparently.
+
+### Parameter/runtime note
+
+V14 adds roughly **10.9K trainable parameters**. The absolute parameter count is small, but the original LSTM experts are themselves very small, so the manuscript should **not** describe the parameter overhead as “negligible”. Batched inference measurements on the 4090 did not show a substantive latency increase.
+
+## Official paper protocol and targets
+
+The journal comparison must use the same paper protocol rather than internal smoke tests or unrelated temporal-holdout baselines:
+
+- input length: `L = 12`
+- prediction horizon: `P = 6`
+- train/test split: `8:2`
+- seeds for frozen journal evidence: `42, 43, 44, 45, 46`
+- primary metrics: MAE and MSE
+
+Correct ICDM 2024 L=12 targets:
+
+| Dataset | MetaSTC+LSTM MAE/MSE | MetaSTC+FiLM MAE/MSE |
+|---|---:|---:|
+| Beijing | 3.534 / 27.433 | 3.367 / 26.893 |
+| Shanghai | 4.524 / 42.380 | 4.018 / 37.076 |
+| LargeST | 4.644 / 45.520 | 4.369 / 43.333 |
+
+> **Important FiLM warning:** some raw FiLM `metrics.json` files contain a legacy `paper_target_l12` field inherited from the LSTM experiment path. Do **not** use that field for paper comparison. Use `unified_results.*` and the FiLM targets above.
+
+## Frozen experiment assets
+
+### Static MetaSTC anchors
+
+The static anchors required by the frozen code are committed at their expected runtime paths:
+
+```text
+param/4090_tuned/lstm/beijing/
+param/4090_tuned/epoch60/lstm/shanghai/
+param/4090_tuned/epoch60/lstm/largest/
+
+param/4090_tuned/film/beijing/
+param/4090_tuned/film/shanghai/
+param/4090_tuned/film/largest/
+```
+
+Each directory contains the corresponding configuration, cluster labels, global/cluster checkpoints, metrics, and training log needed for reproducibility.
+
+### Journal V14 evidence
+
+```text
+results/journal_handoff_20260906/
+├── unified_results.md / .csv / .json
+├── lstm_matched_controls/
+│   ├── beijing/
+│   ├── shanghai/
+│   ├── largest/
+│   ├── p0_02_shift_gate_gain/
+│   └── summary.md / summary.json
+├── film_five_seed/
+│   └── seed_42 ... seed_46/
+└── diagnostics/
+```
+
+The package contains per-seed metrics, final adapters, matched controls, logs, and diagnostic evidence. This package is the preferred source for all paper-facing numbers.
+
+## Manuscript assets
+
+The current TKDE manuscript package is in:
+
+```text
+manuscript/TKDE_MetaSTC_v14/
+```
+
+It contains:
+
+- `TKDE_MetaSTC_Journal.tex` — current editable journal version
+- `TKDE_MetaSTC_Journal_review.pdf` — compact review PDF
+- `TKDE_MetaSTC_original_20260906.tex` — preserved source snapshot
+- `traffic-prediction.bib`
+- IEEE template files
+- figures actually referenced by the manuscript
+
+LaTeX build products such as `.aux`, `.log`, `.fls`, `.fdb_latexmk`, and `synctex` files are intentionally not part of the handoff package.
+
+## What students should do next
+
+1. Build the final paper-facing LSTM + FiLM tables directly from `unified_results.*`; do not retrain merely to recreate existing numbers.
+2. Use the three-dataset LSTM stability as the main performance result and FiLM as supporting cross-realization evidence.
+3. Integrate the Shanghai positive mechanism case together with the Beijing/LargeST matched-control counterexamples.
+4. Verify every number, table, figure, setting, and claim in the manuscript against the frozen result package.
+5. Compile the current TKDE manuscript and perform a full **gap audit**.
+6. Only after the gap audit, list genuinely missing reviewer-facing experiments (for example cross-city/generalization, explicit distribution shift, tail/worst-segment behavior) for PI approval before running them.
+
+## What should not be done by default
+
+- Do not continue Beijing FiLM hyperparameter chasing; the completed validation-only search did not produce a better justified choice.
+- Do not create V15/V16 without a new research decision.
+- Do not change the train/test split, paper targets, objective, or model-selection rules silently.
+- Do not use the test set to choose hyperparameters.
+- Do not hide the `linear_cluster` or `shared_no_task` counterevidence.
+- Do not claim universal dynamic-task-discovery or universal mechanism dominance from the current results.
+
+## 4090 research environment
+
+Current server-side project environment used for the frozen experiments:
+
+- workspace: `/workspace/MetaSTC-J`
+- Python: `/opt/conda/bin/python`
+- PyTorch: `2.6.0+cu124`
+- GPUs: 2 × NVIDIA GeForce RTX 4090
+
+FiLM uses FP32 because the current FFT configuration is not compatible with the intended FP16/BF16 path. The training/evaluation scripts use dataset-native cluster counts: Beijing=5, Shanghai=3, LargeST=3.
+
+## Historical conference-reproduction baseline
+
+Before the journal extension, the original MetaSTC behavior was reproduced closely enough to serve as the static anchor. Earlier single-run values and paper-scale diagnostics under `param/4090_tuned/` were useful during reproduction/debugging, but they are **not the authoritative journal conclusion anymore**.
+
+For the journal version, always prefer:
+
+```text
+results/journal_handoff_20260906/unified_results.*
+```
+
+over old single-run tables or legacy diagnostic notes.
+
+## Project status in one sentence
+
+**MetaSTC-J has completed the current V14 experimental exploration; LSTM provides stable three-dataset journal gains, FiLM provides qualified cross-realization support, mechanism claims are bounded by matched-control evidence, and the project is now ready for student-led manuscript consolidation rather than continued open-ended tuning.**
