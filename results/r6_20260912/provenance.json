@@ -1,0 +1,22 @@
+{
+  "recorded_at": "2026-09-12",
+  "study": "MetaSTC-J unified fast/slow peer-deviation R6",
+  "status": "completed_and_saved_inference_verified",
+  "scope": {"backbone": "FiLM", "datasets": ["beijing", "shanghai", "largest"], "history_lengths": [12, 24], "prediction_length": 6, "seeds": [42, 43, 44, 45, 46], "primary_runs": 30},
+  "models_in_csv": ["static", "unified", "no_background", "no_dynamic"],
+  "csv_units": "Reported units. LargeST is already divided by 7.15 for MAE and 7.15 squared for MSE; do not scale again.",
+  "summary_format": {"std": "sample standard deviation, ddof=1", "percentage": "100 * (model_mean / reference - 1); negative means improvement", "aggregate_rows": 48, "per_seed_rows": 120},
+  "seed_scope": "Reuse the exact previously independently trained seed42-46 FiLM backbones; refit residual heads and prototypes. These are not thirty newly trained backbones in the R6 round.",
+  "architecture": {"state_prototypes": 4, "correlation_neighbors": 16, "peer_dropout": 0.5, "same_architecture_all_cases": true, "ordinary_hyperparameters": "selected per case under the same chronological development procedure", "end_to_end_meta_trained_new_head": false, "online_prototype_updates": false},
+  "data": {
+    "beijing": {"source": "data/traffic_flow/1/20230306/part-00000_new.pkl", "nodes": 7949, "timestamps": 288, "sha256": "eb5301ce4bc75c857a1e404fc1d311a308b6c9aa4b4c4df54055d2b2d538a1df"},
+    "shanghai": {"source": "data/traffic_flow/4/20230602/shanghai_0602.pkl", "nodes": 144, "timestamps": 288, "sha256": "7ee6362d352e904839bdb5cf3efc4dce29773bcbf806abfeaaf6cf8fd2ca9afb", "current_dataset_confirmed_by_pi": true},
+    "largest": {"source": "data/gla/gla_his_2019_first288.npy", "nodes": 3834, "timestamps": 288, "sha256": "1016f0a34deebc7163a660d90f4859f749b782d20501f89d1119624f0ea0ee52", "fixed_report_divisor": 7.15, "report_scale_confirmed_by_pi": true}
+  },
+  "protocol": {"indexing": "zero based, half-open intervals", "folds": [{"train": [0, 180], "validation_targets": [180, 205]}, {"train": [0, 205], "validation_targets": [205, 230]}], "final_fit": [0, 230], "test_start_indices_inclusive": {"L12": [230, 269], "L24": [230, 257]}, "test_windows": {"L12": 40, "L24": 28}, "test_used_for_this_round_configuration_selection": false, "historical_test_previously_seen_during_development": true},
+  "independent_audit": {"status": "passed", "runs": 30, "method": "independent past-only peer-window construction, portable residual forward, saved graph/head reload and original native FiLM", "new_training_or_model_selection": false, "max_absolute_raw_MAE_difference": 3.6602536113150563e-08, "max_absolute_raw_MSE_difference": 1.1664334579108981e-05},
+  "evidence": {"repository": "GaoYucen/server-control", "access": "private; permission required", "results_commit": "4cf68276cdd9fb5a749d200ef38804e3ce86bf41", "independent_audit_commit": "69e83943f73e480179fd5ec46784ef6e1afb5904", "path": "research-rounds/MetaSTC-J/multiscale_peer_r6_20260912/evidence", "executed_R6_source_sha256": "07f161ea485cba948f51b63f6eb31906fdf8e4db434ad1006bdd7e911d763fe3", "executed_R5_parent_sha256": "f12c70c338b07d1fa088b37553297cfa8796eed9ae29ed52226ff40fc917d56c", "original_lightweight_package_hash_records_checked": 184},
+  "server": {"root": "/workspace/MetaSTC-J", "study": "/workspace/MetaSTC-J/outputs/multiscale_peer_r6_20260912", "backbones": "/workspace/MetaSTC-J/outputs/minimal_film_20260912", "independent_audit_entry": "outputs/multiscale_peer_r6_20260912/portable_inference.py"},
+  "this_public_documentation_update": "README, numeric CSVs and provenance only. No datasets, large backbones, residual weights or full training dependency chain were uploaded in this update.",
+  "limitations": ["Only 288 timestamps per current cache", "Five seeds do not establish cross-date generalization or statistical significance", "Conference numbers are historical references, distinct from same-protocol paired backbones", "R6 on LSTM and future horizons beyond P6 are not yet validated", "No-background and no-dynamic are matched-procedure comparisons, not complete equal-capacity causal attribution"]
+}
