@@ -1,212 +1,305 @@
-# MetaSTC-J — MetaSTC Journal Extension
+# MetaSTC-J：期刊扩展技术路线与实验交接
 
-> Last updated: **2026-09-07**  
-> Active branch: **`dev-260902-dynamic`**  
-> Current phase: **journal manuscript consolidation / student handoff**  
-> Frozen handoff commit: **`30ac60507ac5c52e7251309d8f68f0f3d73ae7dd`**
+> 更新：2026-09-12 · 工作分支：`dev-260902-dynamic` · 当前候选主方法：**R6 统一快慢偏差动态残差模型**。  
+> 已验证范围：**FiLM 底座 × Beijing / Shanghai / LargeST × L=12/24 → P=6 × seeds 42–46**。  
+> 当前工作重点：保存 R6，整理期刊稿，按文末清单补齐必要实验；不再默认进行无边界性能搜索。
 
-MetaSTC-J is the journal extension of the ICDM 2024 MetaSTC work. The current experimental exploration has been **closed and frozen**. The default next step is no longer open-ended architecture tuning; it is to consolidate the paper, verify all claims against the frozen evidence, and add only genuinely necessary reviewer-facing experiments after PI review.
+## 1. 当前结论与阅读入口
 
-## Start here
+R6 在三个数据集、两种历史长度上的 MAE/MSE 五种子均值均低于会议版对应记录；每个种子的两项指标也都低于会议目标及同次静态 FiLM 底座。六组结果均来自**同一架构与相同选模流程**，没有按城市拼接 R1、V14、R4 等不同方法的最好结果。
 
-Students taking over this project should read the following files in order:
+这是当前数据与协议下的性能结论，不等于独立跨日期泛化已验证，也不等于全部投稿实验已完成。历史测试段已在模型开发中查看；本轮复用了此前分别训练的五个 FiLM 底座，重新拟合残差头及状态原型，**不是本轮重新训练了 30 个底座**。
 
-1. [`STUDENT_HANDOFF.md`](STUDENT_HANDOFF.md)
-2. [`docs/STUDENT_HANDOFF_20260906.md`](docs/STUDENT_HANDOFF_20260906.md)
-3. [`results/journal_handoff_20260906/unified_results.md`](results/journal_handoff_20260906/unified_results.md)
-4. [`docs/JOURNAL_P0_FREEZE.md`](docs/JOURNAL_P0_FREEZE.md)
-5. [`results/journal_handoff_20260906/lstm_matched_controls/summary.md`](results/journal_handoff_20260906/lstm_matched_controls/summary.md)
-6. [`manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex`](manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex)
+| 入口 | 内容 |
+|---|---|
+| [aggregate.csv](results/r6_20260912/aggregate.csv) | 完整 R6、同底座、去背景、去动态的 48 行均值/样本标准差及相对变化 |
+| [per_seed.csv](results/r6_20260912/per_seed.csv) | 30 组数据集/长度/种子组合，每组四种方法，共 120 行 MAE/MSE |
+| [selected_configurations.csv](results/r6_20260912/selected_configurations.csv) | 六组最终配置与开发集相对误差 |
+| [provenance.json](results/r6_20260912/provenance.json) | 数据指纹、固定证据版本、独立审计与复现路径 |
+| [旧 V14 README 快照](https://github.com/GaoYucen/MetaSTC-J/blob/93baa47278c4348ca0ad698555b2e3de5ef89a36/README.md) | 2026-09-07 的历史路线和交接说明，不是 R6 当前结论 |
 
-The frozen result package is located at:
+**版本关系：**旧 `model_code/dynamic_residual_meta_adapter_film_v14.py` 是 V14，不是 R6。旧 LSTM/V14 的正结果可以保留为历史材料，不能当成“R6 已在 LSTM 上验证”的证据。旧稿件中的“LSTM 为主、FiLM 仅作有限支持”等表述需要根据本次候选路线更新。
 
-```text
-results/journal_handoff_20260906/
-```
+## 2. 技术路线：从静态任务先验到状态条件化快慢修正
 
-The current editable journal manuscript is located at:
+### 2.1 保留什么，新增什么
 
-```text
-manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex
-```
-
-## Current research route
-
-The journal extension preserves the conference MetaSTC model as a strong **Static MetaSTC Anchor** and adds a conservative context-conditioned residual adaptation mechanism:
+保留 MetaSTC 的道路任务划分与元学习预测底座。对道路 i，底座根据其 L 步历史输出未来 P 步预测 b。R6 冻结这个底座，在其输出上增加一个**共同拟合的残差头**：
 
 ```text
-y_hat = y_static + gate(context) * residual(context, task/state)
+道路历史 ── 静态任务/FiLM 底座 ── 基础预测 b ───────────────────┐
+    │                                                        │
+    ├─ 本路段历史与基础预测相对最新观测的偏差 ── 局部变化块 ──┤
+    ├─ 相关路段历史相对其自身最新观测的偏差 ── 快空间变化块 ──┤→ 联合残差修正 → 最终预测
+    └─ 训练期背景与当前观测的偏差 ──────────── 慢背景块 ──────┤
+                                                             │
+训练期静态任务先验 + 输入条件化软状态权重 ── 条件化上述修正核 ─┘
 ```
 
-The intended interpretation is a **continuous context-conditioned latent task/state representation**, rather than a claim that discrete dynamic task discovery has been established.
+原 V14 在北京曾出现 validation 改善而 test 退化。R1 的受约束局部残差改善了稳定性，但收益较小；R5 引入中心化邻居变化后，北京和上海改善，而 LargeST 仍未达会议目标。R6 在同一个头中加入分别正则化的慢背景偏差，得到本次统一结果。这是设计演进的观察，不是各项改变的完整因果分解。
 
-Current frozen implementations:
+### 2.2 三组输入特征
 
-- LSTM mechanism: `model_code/dynamic_residual_mechanism_v14.py`
-- LSTM matched-control sweep: `model_code/dynamic_residual_mechanism_sweep_v14.py`
-- FiLM realization: `model_code/dynamic_residual_meta_adapter_film_v14.py`
+以下公式省略训练期归一化和各特征块的 RMS 缩放；实现中这些统计量均仅由训练数据计算。
 
-Do not silently modify the frozen V14 mechanism. Architecture changes require a new research decision and a new version.
-
-## Latest paper-level results
-
-The authoritative summary is [`results/journal_handoff_20260906/unified_results.md`](results/journal_handoff_20260906/unified_results.md). Results below use seeds **42–46**. Negative Δ means the journal V14 result is better than the corresponding ICDM 2024 MetaSTC result.
-
-| Realization | Dataset | ICDM MAE | Journal MAE mean ± std | ΔMAE | MAE wins | ICDM MSE | Journal MSE mean ± std | ΔMSE | MSE wins |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| LSTM | Beijing | 3.534 | **3.5109 ± 0.0191** | **-0.65%** | **5/5** | 27.433 | **27.2152 ± 0.2567** | **-0.79%** | 4/5 |
-| LSTM | Shanghai | 4.524 | **4.2654 ± 0.0177** | **-5.72%** | **5/5** | 42.380 | **39.3072 ± 0.2180** | **-7.25%** | **5/5** |
-| LSTM | LargeST | 4.644 | **4.4582 ± 0.0328** | **-4.00%** | **5/5** | 45.520 | **44.6292 ± 0.4482** | **-1.96%** | **5/5** |
-| FiLM | Beijing | 3.367 | 3.3975 ± 0.0173 | +0.91% | 0/5 | 26.893 | **26.7645 ± 0.1578** | **-0.48%** | 4/5 |
-| FiLM | Shanghai | 4.018 | 4.0368 ± 0.0435 | +0.47% | 1/5 | 37.076 | **36.2305 ± 0.2833** | **-2.28%** | **5/5** |
-| FiLM | LargeST | 4.369 | **4.2718 ± 0.0154** | **-2.22%** | **5/5** | 43.333 | **43.0410 ± 0.2948** | **-0.67%** | 4/5 |
-
-### Main performance conclusion
-
-**LSTM V14 is the primary journal result.** Its five-seed mean MAE and MSE both improve over ICDM 2024 MetaSTC+LSTM on Beijing, Shanghai, and LargeST. More importantly, all **15 dataset-seed MAE runs** (3 datasets × 5 seeds) beat the corresponding conference-paper value.
-
-This is sufficiently stable to serve as the main performance evidence. The project should not return to open-ended LSTM tuning merely to enlarge the numerical gains.
-
-### FiLM conclusion
-
-FiLM is supporting evidence that the framework transfers to another realization/backbone, but the gain is **dataset- and metric-dependent**:
-
-- LargeST improves both MAE and MSE across five-seed means.
-- Beijing and Shanghai improve mean MSE, but mean MAE is slightly worse than the conference FiLM result by about 0.91% and 0.47%, respectively.
-- Therefore the paper may claim cross-realization applicability, but **must not claim universal performance improvement for FiLM**.
-
-## Mechanism evidence and claim boundary
-
-The matched-control experiments are essential for interpreting V14 correctly.
-
-Current evidence does **not** support a universal claim that richer context-conditioned adaptation always dominates simpler residual controls:
-
-- On **Beijing**, `linear_cluster` has lower matched-control mean MAE than V14.
-- On **LargeST**, `shared_no_task` has lower matched-control mean MAE than V14.
-- **Shanghai** is the clearest positive mechanism case: for V14 seed 42, V14 beats the linear control on all 40 test windows, and the high-static-error tercile shows about **0.0928 additional MAE benefit** over the linear control.
-
-The journal story should therefore emphasize **selective/context-dependent value under difficult regimes**, while reporting the Beijing and LargeST counterevidence transparently.
-
-### Parameter/runtime note
-
-V14 adds roughly **10.9K trainable parameters**. The absolute parameter count is small, but the original LSTM experts are themselves very small, so the manuscript should **not** describe the parameter overhead as “negligible”. Batched inference measurements on the 4090 did not show a substantive latency increase.
-
-## Official paper protocol and targets
-
-The journal comparison must use the same paper protocol rather than internal smoke tests or unrelated temporal-holdout baselines:
-
-- input length: `L = 12`
-- prediction horizon: `P = 6`
-- train/test split: `8:2`
-- seeds for frozen journal evidence: `42, 43, 44, 45, 46`
-- primary metrics: MAE and MSE
-
-Correct ICDM 2024 L=12 targets:
-
-| Dataset | MetaSTC+LSTM MAE/MSE | MetaSTC+FiLM MAE/MSE |
-|---|---:|---:|
-| Beijing | 3.534 / 27.433 | 3.367 / 26.893 |
-| Shanghai | 4.524 / 42.380 | 4.018 / 37.076 |
-| LargeST | 4.644 / 45.520 | 4.369 / 43.333 |
-
-> **Important FiLM warning:** some raw FiLM `metrics.json` files contain a legacy `paper_target_l12` field inherited from the LSTM experiment path. Do **not** use that field for paper comparison. Use `unified_results.*` and the FiLM targets above.
-
-## Frozen experiment assets
-
-### Static MetaSTC anchors
-
-The static anchors required by the frozen code are committed at their expected runtime paths:
+**局部变化块。**以预测起点的最新观测 x(i,t) 为参照，输入 L−1 个历史偏差及 P 个底座预测偏差：
 
 ```text
-param/4090_tuned/lstm/beijing/
-param/4090_tuned/epoch60/lstm/shanghai/
-param/4090_tuned/epoch60/lstm/largest/
-
-param/4090_tuned/film/beijing/
-param/4090_tuned/film/shanghai/
-param/4090_tuned/film/largest/
+z_local = [x(i,t-L+1:t-1) - x(i,t), b(i,1:P) - x(i,t)]
 ```
 
-Each directory contains the corresponding configuration, cluster labels, global/cluster checkpoints, metrics, and training log needed for reproducibility.
+FiLM 和该局部块都使用本设置完整的 L 步历史；L24 并没有改成 L12 预测。路由器的近期状态描述使用最近 12 步，须与预测输入长度区分。
 
-### Journal V14 evidence
+**快空间变化块。**用训练期 Pearson 相似度选出 16 个相关路段，排除自身；相似度经温度 0.1 的 softmax 形成权重。利用训练期标准差对邻居信号进行尺度匹配，得到聚合历史 p(i,·)，再减去聚合历史的最新观测：
 
 ```text
-results/journal_handoff_20260906/
-├── unified_results.md / .csv / .json
-├── lstm_matched_controls/
-│   ├── beijing/
-│   ├── shanghai/
-│   ├── largest/
-│   ├── p0_02_shift_gate_gain/
-│   └── summary.md / summary.json
-├── film_five_seed/
-│   └── seed_42 ... seed_46/
-└── diagnostics/
+z_peer = p(i,t-L+1:t-1) - p(i,t)
 ```
 
-The package contains per-seed metrics, final adapters, matched controls, logs, and diagnostic evidence. This package is the preferred source for all paper-facing numbers.
+这里的邻居是统计相关路段，不应称为已经验证的真实道路拓扑。预测时仅访问与目标输入窗口同期的过去观测，不能读取邻居在预测区间内的未来值。
 
-## Manuscript assets
-
-The current TKDE manuscript package is in:
+**慢背景块。**保留两种背景偏差：
 
 ```text
-manuscript/TKDE_MetaSTC_v14/
+z_background = [
+  mean_train(i) - x(i,t),
+  p(i,t) - mean_train(p(i)) + mean_train(i) - x(i,t)
+]
 ```
 
-It contains:
+第一项表示本路段训练期背景与当前值的差异；第二项是训练均值校准后的当前邻居估计与本路段当前值的差异。它们不含测试标签，也不是将预测固定拉向均值。该块与快变化块共同拟合，但有独立正则强度。
 
-- `TKDE_MetaSTC_Journal.tex` — current editable journal version
-- `TKDE_MetaSTC_Journal_review.pdf` — compact review PDF
-- `TKDE_MetaSTC_original_20260906.tex` — preserved source snapshot
-- `traffic-prediction.bib`
-- IEEE template files
-- figures actually referenced by the manuscript
+### 2.3 动态软状态与残差核
 
-LaTeX build products such as `.aux`, `.log`, `.fls`, `.fdb_latexmk`, and `synctex` files are intentionally not part of the handoff package.
+状态描述由最新水平、近期均值/波动、近期趋势、底座预测偏离当前值的程度等组成。训练期使用 K-means 拟合 **4 个状态原型**；推理时计算输入到原型的距离并得到 softmax 归属：
 
-## What students should do next
+$$
+\pi_k(s)=\operatorname{softmax}_k\left(-\|\widetilde{s}-\mu_k\|^2/\tau\right).
+$$
 
-1. Build the final paper-facing LSTM + FiLM tables directly from `unified_results.*`; do not retrain merely to recreate existing numbers.
-2. Use the three-dataset LSTM stability as the main performance result and FiLM as supporting cross-realization evidence.
-3. Integrate the Shanghai positive mechanism case together with the Beijing/LargeST matched-control counterexamples.
-4. Verify every number, table, figure, setting, and claim in the manuscript against the frozen result package.
-5. Compile the current TKDE manuscript and perform a full **gap audit**.
-6. Only after the gap audit, list genuinely missing reviewer-facing experiments (for example cross-city/generalization, explicit distribution shift, tail/worst-segment behavior) for PI approval before running them.
+原型、状态标准化及温度在推理期间固定；**随输入变化的是软归属，而不是在线重新聚类或在线更新原型**。当前实现也不是端到端可微任务发现系统。
 
-## What should not be done by default
+将归一化后的三组特征拼成 z，以 g 表示共享项、中心化静态任务编码以及中心化软归属编码，残差可写成：
 
-- Do not continue Beijing FiLM hyperparameter chasing; the completed validation-only search did not produce a better justified choice.
-- Do not create V15/V16 without a new research decision.
-- Do not change the train/test split, paper targets, objective, or model-selection rules silently.
-- Do not use the test set to choose hyperparameters.
-- Do not hide the `linear_cluster` or `shared_no_task` counterevidence.
-- Do not claim universal dynamic-task-discovery or universal mechanism dominance from the current results.
+$$
+\widehat{y}=b+\sigma_e\,\operatorname{vec}(g\otimes z)\,W.
+$$
 
-## 4090 research environment
+实现使用 C−1 个静态任务编码、K−1 个软状态编码和一个共享项，避免冗余。静态任务项与动态状态项共同条件化三个特征块；不是给每个“道路任务×动态状态”组合都训练一套独立网络。
 
-Current server-side project environment used for the frozen experiments:
+**建议论文主线：静态任务先验 + 输入条件化软状态划分 + 快慢偏差联合适配。**空间信息、背景信息、残差表达能力和动态路由均可能贡献收益，不能把相对会议版的全部提升都归因于动态分组。
 
-- workspace: `/workspace/MetaSTC-J`
-- Python: `/opt/conda/bin/python`
-- PyTorch: `2.6.0+cu124`
-- GPUs: 2 × NVIDIA GeForce RTX 4090
+### 2.4 拟合方式与统一方法的含义
 
-FiLM uses FP32 because the current FFT configuration is not compatible with the intended FP16/BF16 path. The training/evaluation scripts use dataset-native cluster counts: Beijing=5, Shanghai=3, LargeST=3.
+残差核采用分块正则化的线性求解；状态权重对输入非线性，因此整体预测器不是一个固定线性回归。候选目标为 MSE，或通过固定 3 步 IRLS 近似优化的平衡平方/绝对误差目标。原型拟合与核求解为分阶段训练，**新增头并未实施新的端到端元梯度训练**。
 
-## Historical conference-reproduction baseline
+快空间块的 dropout 概率固定为 0.5，通过期望二次损失对应的 Gram 矩阵修正实现；推理不随机关闭空间块。这不是 confidence-aware 或测试时回退机制。R6 只保证所有快慢偏差同时为零时修正为零；近期序列恒定而背景不同，仍可能产生修正。
 
-Before the journal extension, the original MetaSTC behavior was reproduced closely enough to serve as the static anchor. Earlier single-run values and paper-scale diagnostics under `param/4090_tuned/` were useful during reproduction/debugging, but they are **not the authoritative journal conclusion anymore**.
+三个数据集共享架构、特征定义、状态数、邻居数和验证规则；普通正则系数/目标选项可以不同。R6 继承 R5 在相同开发流程中选出的局部与快空间正则，再比较背景惩罚 `{0.1,1,10,100,1000,10000}` 与两种目标。不能把这些不同普通配置误报为全局完全相同的超参数。
 
-For the journal version, always prefer:
+| 设置 | ridge λ | 快空间相对惩罚 | 慢背景相对惩罚 | 目标 |
+|---|---:|---:|---:|---|
+| Beijing L12 / L24 | 0.001 | 1 | 1000 | MSE |
+| Shanghai L12 | 0.01 | 100 | 100 | MSE |
+| Shanghai L24 | 0.01 | 100 | 100 | balanced |
+| LargeST L12 / L24 | 0.001 | 1 | 0.1 | MSE |
+
+## 3. 当前主结果
+
+### 3.1 与会议版记录比较
+
+下表是 FiLM 的结果，L 是输入长度，**P 始终为 6**。R6 数字为 seeds 42–46 的均值 ± 样本标准差；降幅为 `(会议值−R6均值)/会议值`。会议值是历史发表参考，不是本轮五种子重训结果。
+
+| 数据集 | L→P | 会议 MAE / MSE | R6 MAE | R6 MSE | MAE / MSE 降幅 |
+|---|---|---:|---:|---:|---:|
+| Beijing | 12→6 | 3.367 / 26.893 | **3.3064 ± 0.0030** | **25.3388 ± 0.0232** | **1.80% / 5.78%** |
+| Beijing | 24→6 | 3.476 / 27.527 | **3.3754 ± 0.0014** | **25.7340 ± 0.0113** | **2.89% / 6.51%** |
+| Shanghai | 12→6 | 4.018 / 37.076 | **3.8962 ± 0.0007** | **34.7271 ± 0.0104** | **3.03% / 6.34%** |
+| Shanghai | 24→6 | 4.173 / 37.992 | **4.0049 ± 0.0018** | **35.1594 ± 0.0358** | **4.03% / 7.46%** |
+| LargeST | 12→6 | 4.369 / 43.333 | **4.1385 ± 0.0035** | **40.0267 ± 0.0310** | **5.28% / 7.63%** |
+| LargeST | 24→6 | 4.491 / 44.398 | **4.1378 ± 0.0053** | **39.7416 ± 0.1373** | **7.86% / 10.49%** |
+
+每组五个种子、两项指标均低于对应会议目标。北京已不再仅依靠最后一位小数过线。但五种子波动不能替代跨日期统计，也未据此声明统计显著性。
+
+### 3.2 与同次静态底座的配对比较
+
+| 设置 | 静态底座 MAE / MSE | R6 MAE / MSE | MAE / MSE 降幅 | 两项指标分别改善的种子数 |
+|---|---:|---:|---:|---|
+| Beijing L12 | 3.3863 / 27.4614 | 3.3064 / 25.3388 | 2.36% / 7.73% | 5/5；5/5 |
+| Beijing L24 | 3.5176 / 28.2991 | 3.3754 / 25.7340 | 4.04% / 9.06% | 5/5；5/5 |
+| Shanghai L12 | 3.9628 / 36.4206 | 3.8962 / 34.7271 | 1.68% / 4.65% | 5/5；5/5 |
+| Shanghai L24 | 4.1263 / 37.1102 | 4.0049 / 35.1594 | 2.94% / 5.26% | 5/5；5/5 |
+| LargeST L12 | 4.6043 / 53.5126 | 4.1385 / 40.0267 | 10.12% / 25.20% | 5/5；5/5 |
+| LargeST L24 | 4.8864 / 58.9400 | 4.1378 / 39.7416 | 15.32% / 32.57% | 5/5；5/5 |
+
+该对比固定每个种子的底座，衡量新增整体模块的收益。底座不接收 R6 的新增跨路段输入，因此它不是“同信息量、同容量”的动态机制对照；动态机制应主要通过下节的 `no_dynamic` 检验。
+
+### 3.3 已完成的消融结果
+
+| 设置 | 无慢背景 `no_background` MAE / MSE | 无动态状态 `no_dynamic` MAE / MSE | 完整 R6 MAE / MSE |
+|---|---:|---:|---:|
+| Beijing L12 | 3.3365 / 26.4556 | 3.3166 / 25.4129 | **3.3064 / 25.3388** |
+| Beijing L24 | 3.4020 / 26.6570 | 3.4039 / 25.9242 | **3.3754 / 25.7340** |
+| Shanghai L12 | 3.9165 / 35.6132 | 3.9181 / 35.0079 | **3.8962 / 34.7271** |
+| Shanghai L24 | 4.0307 / 35.7009 | 4.0341 / 35.6179 | **4.0049 / 35.1594** |
+| LargeST L12 | 4.4600 / 48.2347 | 4.3895 / 43.5603 | **4.1385 / 40.0267** |
+| LargeST L24 | 4.7436 / 54.4706 | 4.2550 / 41.4695 | **4.1378 / 39.7416** |
+
+这两项消融均已有六组设置、五种子结果，不必为生成相同表格重复训练。`no_background` 是 R5 的函数类，不表示直接复用 R5 的所有最优参数/数值；`no_dynamic` 保留相同快慢信息及静态任务相关核，仅删除输入相关的软状态编码。已有消融分别进行验证选模，不是推理时临时置零。完整 R6 在全部六组的两个均值指标上优于这两个对照，但去动态也减少了参数，等容量对照仍可进一步加强归因。
+
+## 4. 数据、划分与选模协议
+
+### 4.1 实际使用的数据
+
+| 数据集 | 当前输入文件 | 道路/节点数 | 时间点数 | 静态任务数 |
+|---|---|---:|---:|---:|
+| Beijing | `data/traffic_flow/1/20230306/part-00000_new.pkl` | 7949 | 288 | 5 |
+| Shanghai | `data/traffic_flow/4/20230602/shanghai_0602.pkl` | 144 | 288 | 3 |
+| LargeST | `data/gla/gla_his_2019_first288.npy` | 3834 | 288 | 3 |
+
+Shanghai 使用当前 144 条道路文件，已由项目负责人确认。LargeST 报告固定为 `MAE_raw/7.15` 与 `MSE_raw/7.15²`，已由项目负责人确认；这不是调参变量。原始单位误差保留在运行 JSON 中。CSV 和上表的 LargeST 已缩放，**不能再除一次**。
+
+### 4.2 时间验证与最终评估
+
+所有区间均为零基、左闭右开：
+
+| 阶段 | 用于拟合的数据 | 验证目标时间范围 |
+|---|---|---|
+| 开发折 0 | `[0,180)` | `[180,205)` |
+| 开发折 1 | `[0,205)` | `[205,230)` |
+| 最终拟合 | `[0,230)` | 不再使用最终测试标签选模 |
+
+训练和验证的目标标签不重叠；验证输入可以包含预测时已经观察到的过去。归一化、道路聚类、邻居图、状态原型和背景均值仅由各折训练数据拟合。底座先完成固定的聚类适配，再评价最终使用的专家预测器。
+
+R6 选择规则：每组设置先要求两折平均的 `MAE_dynamic/MAE_static` 与 `MSE_dynamic/MSE_static` **都小于 1**，再按两项比值平均值选优。该条件是两个折的平均，不代表每个单折都通过。六组配置全部冻结后才进行本轮最终推理；不能用 LargeST 的大收益掩盖其他设置退化。
+
+历史测试窗口保持不变：L12 的起点为 230–269，共 40 个；L24 为 230–257，共 28 个。每个窗口取 L 步输入和后续 6 步标签。当前冻结代码有意保留原评估的末端窗口约定，不要在复现中悄悄增加最后一个窗口，或将 L12/L24 误当作相同测试起点后的同一预测时刻集合。
+
+### 4.3 审计与证据边界
+
+30 组保存模型通过了独立推理实现复核：重新构造仅含过去观测的邻居窗口、加载图和残差权重、使用原生 FiLM 输出，再重算 MAE/MSE。独立实现不调用训练脚本的残差预测函数；原始单位 MAE/MSE 最大差异分别约 `3.66e-8` / `1.17e-5`。这验证实现和回执一致，**不是一次新的训练或独立测试**。
+
+当前证据仅覆盖每套数据 288 个时间点。历史测试在此前多轮开发中已被查看，R6 也是观察 R5 后提出的延伸；即使 R6 内部配置先冻结后测试，仍不能称为全新的盲测。五种子标准差反映训练随机性，不能把重叠窗口或道路数量当作独立日期数。会议数值与本轮修正协议下的配对底座必须分别标注。
+
+## 5. 复现资产、入口与版本管理
+
+### 5.1 本仓库与服务器各有什么
+
+本次上传的是 README、结果 CSV 与证据索引。**完整 R6 训练脚本、图/残差参数和大体积 FiLM 底座没有随本次文档更新全部迁入本仓库**；仅 clone 本仓库并运行旧 V14 脚本，不会复现 R6。模块化迁移列在文末交接任务中。
+
+服务器路径：
 
 ```text
-results/journal_handoff_20260906/unified_results.*
+/workspace/MetaSTC-J/
+├── outputs/minimal_film_20260912/             # 五种子底座、两折底座与数据辅助代码
+├── outputs/dynamic_experts_r1_20260912/       # R1 辅助代码（冻结依赖）
+├── outputs/centered_peer_r5_20260912/         # R5 辅助代码及历史结果
+└── outputs/multiscale_peer_r6_20260912/
+    ├── executed_study.py                     # R6 执行源码快照
+    ├── portable_inference.py                 # 独立预测实现及审计入口
+    ├── manifest.json
+    ├── all_selections_frozen.json
+    ├── independent_forward_audit.json
+    ├── graphs/
+    └── {city}_L{12或24}/
+        ├── validation.json / selection.json
+        └── seed_{42至46}/
+            ├── unified.pt
+            ├── no_background.pt
+            ├── no_dynamic.pt
+            └── metrics.json
 ```
 
-over old single-run tables or legacy diagnostic notes.
+历史训练脚本通过 R6→R5→R1→底座辅助代码串联，并包含固定路径。**不要直接再次执行这些冻结训练入口覆盖现有输出**。完整从头复现和新消融必须先改成独立输出路径或迁移成参数化入口；目前没有可直接使用的统一 `--ablation` 命令。
 
-## Project status in one sentence
+在已具备上述资产的 4090 环境中复核现有模型：
 
-**MetaSTC-J has completed the current V14 experimental exploration; LSTM provides stable three-dataset journal gains, FiLM provides qualified cross-realization support, mechanism claims are bounded by matched-control evidence, and the project is now ready for student-led manuscript consolidation rather than continued open-ended tuning.**
+```bash
+cd /workspace/MetaSTC-J
+PYTHONPATH=/workspace/MetaSTC-J /opt/conda/bin/python \
+  outputs/multiscale_peer_r6_20260912/portable_inference.py \
+  --root /workspace/MetaSTC-J
+```
+
+该命令不训练、不选模、不改权重，但会更新独立审计 JSON。通过远程控制下发时使用项目约定的资源锁，不要与其他 GPU 任务抢占资源。环境沿用 `/opt/conda/bin/python`、PyTorch 2.6 系列与 RTX 4090；发布可复现包时还需导出完整依赖版本，不能把本 README 的简要环境当成 lockfile。
+
+### 5.2 固定证据与历史入口
+
+完整轻量证据在私有控制库 `GaoYucen/server-control`，需要该库读取权限：
+
+- 模型与结果：`4cf68276cdd9fb5a749d200ef38804e3ce86bf41`。
+- 追加独立审计：[固定证据目录](https://github.com/GaoYucen/server-control/tree/69e83943f73e480179fd5ec46784ef6e1afb5904/research-rounds/MetaSTC-J/multiscale_peer_r6_20260912/evidence)。完整目录含 `source_snapshot/`、图/残差权重、原始/报告指标、选模历史与校验文件。
+- [最终研判记录](https://github.com/GaoYucen/server-control/blob/ff028065dac6009aa85af7ffa9c3037bd1aca97c/research-rounds/MetaSTC-J/multiscale_peer_r6_20260912/FINAL_ASSESSMENT_ZH.md)。
+
+旧材料保留：[STUDENT_HANDOFF.md](STUDENT_HANDOFF.md)、[2026-09-06 交接](docs/STUDENT_HANDOFF_20260906.md)、[旧结果包](results/journal_handoff_20260906/unified_results.md)、[P0 冻结说明](docs/JOURNAL_P0_FREEZE.md)、[旧 LSTM 对照](results/journal_handoff_20260906/lstm_matched_controls/summary.md)。其中 V14 的默认科研路线和结论已由本文更新，历史数值不得改写成 R6。
+
+当前稿件入口仍是 [`manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex`](manuscript/TKDE_MetaSTC_v14/TKDE_MetaSTC_Journal.tex)，目录名带 V14 不表示已经完成 R6 方法与表格替换。旧稿件、原版源码和冻结 checkpoint 均应保留。
+
+---
+
+## 6. 消融实验怎么做（执行清单）
+
+### 6.1 统一执行原则
+
+主方法固定为 R6 `unified`。每个消融均覆盖三个数据集、L12/L24、P6 和五个种子，复用**同种子同一个底座**。仅检验残差模块时不需要反复训练底座；涉及取消底座元学习/聚类时，才必须按同协议重新训练基线。
+
+消融必须在训练前删除对应特征/编码并重新拟合剩余参数，不能只在测试时把已训练模型的分支设成零。主模型与消融使用同一训练/验证/测试边界、尺度、可用信息规则与合理可比的调参预算，分别由验证集选普通超参数。已有消融是匹配流程比较；进一步做“固定其余超参数只改一个因素”的对照时应另列，不能混称严格单因素因果结论。
+
+先用开发集检查实现，不看 test 挑选新设计；所有要报告的变体配置冻结后一起评估。失败的消融也保留，**不要求每个删减都必须变差才报告**。新结果目录建议 `outputs/r6_ablation_<date>/<variant>/<city>_L<L>/seed_<seed>/`。
+
+### 6.2 消融矩阵
+
+| 优先级 / 状态 | 对照 | 具体怎么改，必须保留什么 | 回答的问题 |
+|---|---|---|---|
+| 已完成 | `static` | 不加残差，使用本轮同种子 FiLM 底座 | 整体新增模块有无收益 |
+| 已完成 | `no_background` | 删除两个慢背景特征，保留局部变化、快空间、静态任务和动态软状态，再拟合 | 慢背景是否必要 |
+| 已完成 | `no_dynamic` | 删除软状态编码，保留完全相同的三组输入及静态任务核，再拟合 | 同信息下动态条件化是否有额外价值 |
+| P0 必补 | `no_all_peer` | **同时删除快空间变化和第二个慢背景中的邻居估计**；保留本路段历史、底座预测及第一项本路段训练均值背景 | 总空间信息贡献；只删快空间不能称“无空间” |
+| P0 必补 | `hard_state` | 相同 4 个原型，softmax 归属改成最近原型 one-hot；训练和推理一起改，重算编码均值并重新拟合，保留全部快慢信息 | 软归属相比硬分配是否值得保留 |
+| P1 | `no_static_task_in_head` | 仅删除残差头的静态任务编码，保留共享项、软状态及三组输入；FiLM 底座不变 | 残差层静态先验是否有补充价值；不能据此声称消融了全部 MetaSTC 聚类/元学习 |
+| P1 | `no_peer_dropout` | 输入、路由、背景均不变，将快空间 dropout 从 0.5 改为 0，即移除对应 Gram 块的放大，再拟合 | 正则化是否帮助稳定使用空间信息 |
+| P1 | `target_background_only` / `peer_background_only` | 分别只保留一个慢背景特征，其他块不变 | 两种慢背景的独立作用 |
+| 条件必补 | 容量匹配的非动态残差头 | 保留相同输入，采用事先约定的接近参数预算的非动态头，给予相当选模预算 | 排除 `no_dynamic` 参数减少造成的容量解释；主文强调动态机制时优先做 |
+
+实现定位：R6 的 `augment()` 构造背景，`features()` 拟合训练期统计，`design()` 拼接条件化特征，`fit()` 处理分块正则与求解；父脚本处理局部/空间特征和状态原型。新增变体须同步修改特征维度、惩罚向量、保存元信息和独立推理检查，不能只新增一个名字让代码默默执行完整模型。
+
+尤其注意：R6 原有 `no_background` / `no_dynamic` 可直接作为已实现对照研究；R5 的 `no_peer` 没有覆盖 R6 新增的邻居背景，因此不能直接冒充 R6 的“无空间”消融。
+
+### 6.3 结果与质量检查
+
+每次保存数据/底座/源码指纹、选中配置、所有验证候选、每个预测步的 MAE/MSE、有符号误差、修正幅度、训练/推理耗时以及重加载检查。汇总表至少包含 `dataset,L,P,seed,variant,MAE_raw,MSE_raw,MAE_reported,MSE_reported,delta_vs_full,delta_vs_static`，再报告五种子均值、样本标准差和配对胜次。
+
+改变预测区间之后的值不应影响既定历史窗口特征；邻居图不得出现自身索引；推理不得更新训练均值、标准差、原型或用 test 重新选邻居。重新加载保存模型后的结果必须与回执一致。去慢背景与有慢背景模型的恒定序列不变量不同，不要复用错误断言。
+
+## 7. 投稿前还需要补哪些实验（按优先级收尾）
+
+**已有、不要重复消耗训练预算：**六组 R6 五种子主结果、同底座比较、`no_background`、`no_dynamic`、30 组独立推理复核、完整原始结果与固定配置。当前已能开始写方法和结果，但还不是所有主张都已得到验证。
+
+### P0：最小投稿实验包
+
+| 事项 | 如何做 | 完成交付 |
+|---|---|---|
+| 结果与代码可复现交接 | 学生先独立复核 CSV/保存模型；将 R6 和依赖整理成一个参数化入口，保留原脚本快照，显式传 root/output/variant，禁止写入冻结目录；先选一个设置从底座到残差完整重建 | 一键复现说明、依赖版本、数据/权重清单、源码和指标一致性记录；完整重建成功不能误报为全部 30 组从头复现 |
+| 核心补充消融 | 完成上节 `no_all_peer` 和 `hard_state`，与已有两项组成最小机制证据；动态优势为核心主张时补容量匹配对照 | 三数据集 × 两种 L 的消融表，负结果照常保留 |
+| 新日期/未参与开发时段的确认 | 保持已确认道路集合和 LargeST 固定缩放；先盘点更多原始日期/时段，冻结架构和选模规则，再在未参与当前开发的时段评价同协议 baseline 与 R6。不重新解释当前反复查看的历史 test 为新盲测 | 单列确认性结果及真实数据范围；若无额外数据，明确记录缺口，不能靠换 seed、移动同一天窗口或反复调 test 伪造独立验证 |
+| 同协议强基线 | 除同次 MetaSTC+FiLM，补 persistence、简单共享/任务相关线性预测与至少一个具有相同空间输入的非动态对照；从原论文已有代表性基线中选择必要项同协议重跑，避免只对比历史表里的数 | 论文主表区分“历史发表参考”和“本次同协议结果”，可见信息与调参预算一致 |
+| 分预测步与分场景分析 | 优先从已有每步指标/保存模型出图，汇总 h=1…6；按输入可计算的流量、波动或变化幅度分组，分组阈值只用训练集确定；同时画原预测与修正，不只挑最好窗口 | 每步误差、分组收益和固定规则选取的成功/失败案例；不需要为画图重新搜索参数 |
+| R6 效率与资源成本 | 测原生端到端 FiLM vs R6 的单次/批量推理、训练/原型/图构建耗时、额外参数及图缓存占用；相同硬件精度、预热与同步，分别报告一次性建图和在线成本 | 成本表；不能沿用 V14 的 10.9K 参数或旧延迟结论，不能仅测预缓存特征后的残差矩阵乘法 |
+
+先完成最小包并形成稿件，不以此为由重新扩展一轮三数据集大网格。新的独立确认结果如不支持当前结论，应如实缩小论文主张，而不是换测试区间直到通过。
+
+### P1：按论文主张补充，不全部自动展开
+
+| 事项 | 建议范围 | 何时必须做 |
+|---|---|---|
+| 同一 R6 迁移到 LSTM | 三数据集先做 L12→6，保持同一个快慢残差结构和规则，再按需要补 L24；旧 LSTM+V14 结果单列 | 主文声称 R6 与 backbone 无关或保留 LSTM+R6 主结果时 |
+| 参数敏感性 | 状态数 K={2,4,8}、邻居数={8,16,32}、dropout={0,0.5}，围绕冻结值一次只改一个因素；优先开发集和小规模种子，不用敏感性图反向重选主表 | 强调软状态/空间设计的稳定性时；不把全部选项做笛卡尔积 |
+| 动态机制可解释性 | 固定道路/窗口规则，画软状态权重随时间变化、状态使用率及其与输入趋势/波动的关系，并与无动态对照的收益对应 | 主文把动态软状态作为核心机制时；不能只展示漂亮热力图即声称发现真实交通任务 |
+| 长预测与更广覆盖 | 另设 P=12/24，重新训练输出层、冻结选模再测试；额外数据集按稿件实际范围补 | 主文声称长预测有效或保留未被 R6 覆盖的数据集/预测设定时。当前 L24→6 不是未来 24 步结果 |
+| 完整取消元学习/底座聚类 | 从头训练匹配 baseline，所有方法同划分同预算；不是删除残差头任务编码就结束 | 期刊新增论点明确涉及底座元学习/聚类必要性时 |
+
+### P2：非本轮快速投稿的默认工作
+
+跨城市迁移、在线/测试时适配、缺失与噪声鲁棒性、大规模全时段部署可以作为扩展，除非稿件明确主张这些能力，否则不要为它们再增加新模块。统计分析应以真实日期/时间块为单位处理相关性；五种子、重叠窗口与大量道路不能直接当成相互独立的证据。
+
+**建议交接分工：**学生 A 负责消融与结果汇总，学生 B 负责独立复现、分步/分场景图和效率评估；负责人确定确认性数据范围、保留哪些论文主张及是否需要跨底座/额外预测长度。先把 R6 当前六组结果写进稿件，完成 P0 与由主张触发的 P1 后再冻结提交版本。
